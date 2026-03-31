@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AdminRole {
+  ADMIN
+}
+
+enum RegistrationOptionCode {
+  ONE_DAY
+  THREE_DAYS
+  THREE_DAYS_WITH_LODGING
+}
+
+enum PaymentPlanType {
+  ONE_PAYMENT
+  TWO_INSTALLMENTS
+}
+
+enum RegistrationStatus {
+  PENDING_REVIEW
+  PARTIALLY_PAID
+  FULLY_PAID
+  REJECTED
+}
+
+enum PaymentReceiptStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model AdminUser {
+  id                    String                     @id @default(cuid())
+  email                 String                     @unique
+  passwordHash          String
+  role                  AdminRole                  @default(ADMIN)
+  isActive              Boolean                    @default(true)
+  reviewedRegistrations RegistrationSubmission[]   @relation("RegistrationReviewedBy")
+  reviewedReceipts      PaymentReceiptSubmission[] @relation("ReceiptReviewedBy")
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+}
+
+model RegistrationSubmission {
+  id                              String                     @id @default(cuid())
+  firstName                       String
+  lastName                        String
+  dni                             String
+  email                           String
+  phone                           String
+  registrationOptionCode          RegistrationOptionCode
+  registrationOptionLabelSnapshot String
+  currencyCode                    String                     @default("ARS")
+  totalAmountExpected             Decimal                    @db.Decimal(10, 2)
+  paymentPlanType                 PaymentPlanType
+  installmentCountExpected        Int
+  status                          RegistrationStatus         @default(PENDING_REVIEW)
+  notes                           String?
+  internalNote                    String?
+  reviewedAt                      DateTime?
+  reviewedByAdminId               String?
+  reviewedByAdmin                 AdminUser?                 @relation("RegistrationReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  paymentReceipts                 PaymentReceiptSubmission[]
+  createdAt                       DateTime                   @default(now())
+  updatedAt                       DateTime                   @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([dni])
+  @@index([email])
+  @@index([registrationOptionCode])
+  @@index([status, createdAt])
+}
+
+model PaymentReceiptSubmission {
+  id                       String                 @id @default(cuid())
+  registrationSubmissionId String
+  installmentNumber        Int
+  amountReported           Decimal                @db.Decimal(10, 2)
+  paymentDate              DateTime?
+  receiptUrl               String
+  receiptPublicId          String
+  receiptOriginalFilename  String?
+  receiptMimeType          String?
+  receiptSizeBytes         Int?
+  status                   PaymentReceiptStatus   @default(PENDING_REVIEW)
+  rejectionReason          String?
+  reviewedAt               DateTime?
+  reviewedByAdminId        String?
+  reviewedByAdmin          AdminUser?             @relation("ReceiptReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  registrationSubmission   RegistrationSubmission @relation(fields: [registrationSubmissionId], references: [id], onDelete: Cascade)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+
+  @@unique([registrationSubmissionId, installmentNumber])
+  @@index([registrationSubmissionId])
+  @@index([status])
+}
