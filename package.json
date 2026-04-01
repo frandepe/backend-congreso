@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "qa:commercial-phase-5": "tsx scripts/verify-commercial-phase-5.ts"
   },
   "keywords": [],
   "author": "",

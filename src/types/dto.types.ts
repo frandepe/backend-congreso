@@ -1,5 +1,7 @@
 import type {
   AdminRole,
+  CommercialKind,
+  CommercialOptionCode,
   PaymentPlanType,
   PaymentReceiptStatus,
   RegistrationOptionCode,
@@ -211,4 +213,205 @@ export type PublicDiscountCouponValidationResponseDto = {
   message: string;
   discountPercentage: number | null;
   expiresAt: Date | null;
+};
+
+export type CommercialStandPricingOptionDto = {
+  code: CommercialOptionCode;
+  label: string;
+  baseAmount: number;
+  discountedAmount: number;
+  equipmentAdditionalAmount: number;
+  paymentPlans: Array<{
+    type: PaymentPlanType;
+    label: string;
+    installmentCount: number;
+  }>;
+};
+
+export type CommercialAdvertisingPricingOptionDto = {
+  code: CommercialOptionCode;
+  label: string;
+  totalAmount: number;
+};
+
+export type CommercialPricingCatalogDto = {
+  standDiscountAmount: number;
+  standEquipmentAdditionalAmount: number;
+  installmentsAvailable: boolean;
+  installmentsAvailableUntil: Date;
+  installmentsTimezone: string;
+  standOptions: CommercialStandPricingOptionDto[];
+  advertisingOptions: CommercialAdvertisingPricingOptionDto[];
+};
+
+export type CommercialDiscountCouponRequestResponseDto = {
+  issued: boolean;
+  message: string;
+  expiresAt: Date | null;
+};
+
+export type CommercialDiscountCouponValidationResponseDto = {
+  valid: boolean;
+  message: string;
+  discountAmount: number | null;
+  expiresAt: Date | null;
+};
+
+export type CommercialSubmissionCreatedDto = {
+  submissionId: string;
+  trackingCode: string;
+  status: RegistrationStatus;
+  commercial: {
+    kind: CommercialKind;
+    optionCode: CommercialOptionCode;
+    label: string;
+    companyName: string;
+    baseAmountExpected: number;
+    equipmentAdditionalAmount: number | null;
+    discountAppliedAmount: number | null;
+    includesEquipment: boolean;
+    totalAmountExpected: number;
+  };
+  paymentPlanType: PaymentPlanType;
+  installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  receipt: {
+    installmentNumber: number;
+    status: PaymentReceiptStatus;
+  };
+  createdAt: Date;
+  message: string;
+};
+
+export type CommercialAdditionalReceiptCreatedDto = {
+  submissionId: string;
+  trackingCode: string;
+  status: RegistrationStatus;
+  paymentPlanType: PaymentPlanType;
+  installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  secondInstallmentExpired: boolean;
+  receipt: {
+    installmentNumber: number;
+    status: PaymentReceiptStatus;
+  };
+  createdAt: Date;
+  message: string;
+};
+
+export type PublicCommercialSubmissionStatusDto = {
+  submissionId: string;
+  trackingCode: string;
+  createdAt: Date;
+  updatedAt: Date;
+  status: RegistrationStatus;
+  commercial: {
+    kind: CommercialKind;
+    optionCode: CommercialOptionCode;
+    label: string;
+    companyName: string;
+    totalAmountExpected: number;
+  };
+  paymentPlanType: PaymentPlanType;
+  installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  secondInstallmentExpired: boolean;
+  secondInstallmentUploadAllowed: boolean;
+  submittedReceiptsCount: number;
+  approvedReceiptsCount: number;
+  pendingReceiptsCount: number;
+  receipts: Array<{
+    installmentNumber: number;
+    status: PaymentReceiptStatus;
+    createdAt: Date;
+  }>;
+};
+
+export type CommercialTrackingCodeRecoveryResponseDto = {
+  found: boolean;
+  message: string;
+};
+
+export type AdminCommercialSubmissionListItemDto = {
+  id: string;
+  createdAt: Date;
+  companyName: string;
+  contactFirstName: string;
+  contactLastName: string;
+  email: string;
+  phone: string;
+  commercialKind: CommercialKind;
+  commercialOptionCode: CommercialOptionCode;
+  commercialOptionLabelSnapshot: string;
+  totalAmountExpected: number;
+  paymentPlanType: PaymentPlanType;
+  installmentCountExpected: number;
+  submittedReceiptsCount: number;
+  includesEquipment: boolean;
+  hasDiscountCoupon: boolean;
+  receiptStatus: PaymentReceiptStatus | null;
+  status: RegistrationStatus;
+  lastReviewedAt: Date | null;
+  reviewedByAdminEmail?: string;
+};
+
+export type AdminCommercialSubmissionDetailReceiptDto = {
+  id: string;
+  installmentNumber: number;
+  amountReported: number;
+  paymentDate: Date | null;
+  receiptUrl: string;
+  receiptOriginalFilename: string | null;
+  receiptMimeType: string | null;
+  receiptSizeBytes: number | null;
+  status: PaymentReceiptStatus;
+  rejectionReason: string | null;
+  reviewedAt: Date | null;
+  reviewedByAdminEmail?: string;
+};
+
+export type AdminCommercialSubmissionDetailDto = {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  companyName: string;
+  contactFirstName: string;
+  contactLastName: string;
+  email: string;
+  phone: string;
+  websiteOrSocialUrl: string | null;
+  commercialKind: CommercialKind;
+  commercialOptionCode: CommercialOptionCode;
+  commercialOptionLabelSnapshot: string;
+  currencyCode: string;
+  baseAmountExpected: number;
+  equipmentAdditionalAmount: number | null;
+  discountAppliedAmount: number | null;
+  discountEligibleEmailNormalized: string | null;
+  discountCouponCode: string | null;
+  totalAmountExpected: number;
+  paymentPlanType: PaymentPlanType;
+  installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  secondInstallmentExpired: boolean;
+  includesEquipment: boolean;
+  status: RegistrationStatus;
+  notes: string | null;
+  internalNote: string | null;
+  reviewedAt: Date | null;
+  reviewedByAdmin: { id: string; email: string } | null;
+  receipts: AdminCommercialSubmissionDetailReceiptDto[];
+};
+
+export type AdminCommercialSubmissionUpdateDto = {
+  id: string;
+  status: RegistrationStatus;
+  internalNote: string | null;
+  reviewedAt: Date | null;
+  reviewedByAdmin: { id: string; email: string } | null;
+  updatedAt: Date;
 };

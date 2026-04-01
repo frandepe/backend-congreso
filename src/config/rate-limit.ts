@@ -25,9 +25,17 @@ const loginRateLimiter = createRateLimiter(5);
 const discountCouponRateLimiter = createRateLimiter(5);
 const submissionCreateRateLimiter = createRateLimiter(10);
 const additionalReceiptRateLimiter = createRateLimiter(10);
+const commercialDiscountCouponRateLimiter = createRateLimiter(5);
+const commercialSubmissionCreateRateLimiter = createRateLimiter(10);
+const commercialAdditionalReceiptRateLimiter = createRateLimiter(10);
+const commercialTrackingRecoveryRateLimiter = createRateLimiter(5);
 
 export {
   additionalReceiptRateLimiter,
+  commercialAdditionalReceiptRateLimiter,
+  commercialDiscountCouponRateLimiter,
+  commercialSubmissionCreateRateLimiter,
+  commercialTrackingRecoveryRateLimiter,
   discountCouponRateLimiter,
   loginRateLimiter,
   submissionCreateRateLimiter,

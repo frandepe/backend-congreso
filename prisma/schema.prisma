@@ -34,6 +34,19 @@ enum PaymentReceiptStatus {
   REJECTED
 }
 
+enum CommercialKind {
+  STAND
+  ADVERTISING
+}
+
+enum CommercialOptionCode {
+  STAND_SPACE_3X3
+  ADVERTISING_WEB_PAGE
+  ADVERTISING_WEB_AND_SCREEN
+  ADVERTISING_BANNERS_CLIENT_PROVIDED
+  ADVERTISING_BANNERS_INCLUDED_BY_CONGRESS
+}
+
 enum DiscountCouponStatus {
   ISSUED
   INVALIDATED
@@ -49,6 +62,8 @@ model AdminUser {
   isActive              Boolean                    @default(true)
   reviewedRegistrations RegistrationSubmission[]   @relation("RegistrationReviewedBy")
   reviewedReceipts      PaymentReceiptSubmission[] @relation("ReceiptReviewedBy")
+  reviewedCommercialSubmissions CommercialSubmission[] @relation("CommercialSubmissionReviewedBy")
+  reviewedCommercialReceipts CommercialPaymentReceipt[] @relation("CommercialReceiptReviewedBy")
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
 }
@@ -117,6 +132,72 @@ model DiscountCoupon {
   @@index([status])
 }
 
+model CommercialSubmission {
+  id                              String                 @id @default(cuid())
+  companyName                     String
+  contactFirstName                String
+  contactLastName                 String
+  email                           String
+  phone                           String
+  websiteOrSocialUrl              String?
+  commercialKind                  CommercialKind
+  commercialOptionCode            CommercialOptionCode
+  commercialOptionLabelSnapshot   String
+  currencyCode                    String                 @default("ARS")
+  baseAmountExpected              Decimal                @db.Decimal(10, 2)
+  equipmentAdditionalAmount       Decimal?               @db.Decimal(10, 2)
+  discountAppliedAmount           Decimal?               @db.Decimal(10, 2)
+  discountEligibleEmailNormalized String?
+  totalAmountExpected             Decimal                @db.Decimal(10, 2)
+  paymentPlanType                 PaymentPlanType        @default(ONE_PAYMENT)
+  installmentCountExpected        Int                    @default(1)
+  installmentAmountExpected       Decimal?               @db.Decimal(10, 2)
+  secondInstallmentDueAt          DateTime?
+  includesEquipment               Boolean                @default(false)
+  notes                           String?
+  internalNote                    String?
+  status                          RegistrationStatus     @default(PENDING_REVIEW)
+  reviewedAt                      DateTime?
+  reviewedByAdminId               String?
+  reviewedByAdmin                 AdminUser?             @relation("CommercialSubmissionReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  usedDiscountCoupon              CommercialDiscountCoupon? @relation("CommercialDiscountCouponUsedBySubmission")
+  paymentReceipts                 CommercialPaymentReceipt[]
+  createdAt                       DateTime               @default(now())
+  updatedAt                       DateTime               @updatedAt
+
+  @@index([commercialKind])
+  @@index([commercialOptionCode])
+  @@index([status])
+  @@index([createdAt])
+  @@index([email])
+  @@index([status, createdAt])
+}
+
+model CommercialDiscountEligibleExhibitor {
+  id              String   @id @default(cuid())
+  emailNormalized String   @unique
+  emailOriginal   String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CommercialDiscountCoupon {
+  id                            String               @id @default(cuid())
+  code                          String               @unique
+  emailNormalized               String
+  status                        DiscountCouponStatus @default(ISSUED)
+  expiresAt                     DateTime
+  usedAt                        DateTime?
+  usedByCommercialSubmissionId  String?              @unique
+  usedByCommercialSubmission    CommercialSubmission? @relation("CommercialDiscountCouponUsedBySubmission", fields: [usedByCommercialSubmissionId], references: [id], onDelete: SetNull)
+  createdAt                     DateTime             @default(now())
+  updatedAt                     DateTime             @updatedAt
+
+  @@index([emailNormalized, createdAt])
+  @@index([status])
+}
+
 model PaymentReceiptSubmission {
   id                       String                 @id @default(cuid())
   registrationSubmissionId String
@@ -139,5 +220,30 @@ model PaymentReceiptSubmission {
 
   @@unique([registrationSubmissionId, installmentNumber])
   @@index([registrationSubmissionId])
+  @@index([status])
+}
+
+model CommercialPaymentReceipt {
+  id                      String               @id @default(cuid())
+  commercialSubmissionId  String
+  installmentNumber       Int
+  amountReported          Decimal              @db.Decimal(10, 2)
+  paymentDate             DateTime?
+  receiptUrl              String
+  receiptPublicId         String
+  receiptOriginalFilename String?
+  receiptMimeType         String?
+  receiptSizeBytes        Int?
+  status                  PaymentReceiptStatus @default(PENDING_REVIEW)
+  rejectionReason         String?
+  reviewedAt              DateTime?
+  reviewedByAdminId       String?
+  reviewedByAdmin         AdminUser?           @relation("CommercialReceiptReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  commercialSubmission    CommercialSubmission @relation(fields: [commercialSubmissionId], references: [id], onDelete: Cascade)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  @@unique([commercialSubmissionId, installmentNumber])
+  @@index([commercialSubmissionId])
   @@index([status])
 }

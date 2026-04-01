@@ -24,6 +24,31 @@ type DiscountCouponEmailInput = {
   expiresAt: Date;
 };
 
+type CommercialSubmissionConfirmationEmailInput = {
+  to: string;
+  trackingCode: string;
+  commercialKindLabel: string;
+  commercialOptionLabel: string;
+  companyName: string;
+  paymentPlanLabel: string;
+  totalAmountExpected: number;
+  installmentAmountExpected: number | null;
+  discountAppliedAmount: number | null;
+  equipmentAdditionalAmount: number | null;
+  secondInstallmentDueAt: Date | null;
+};
+
+type CommercialStandDiscountCouponEmailInput = {
+  to: string;
+  couponCode: string;
+  expiresAt: Date;
+};
+
+type CommercialTrackingCodeRecoveryEmailInput = {
+  to: string;
+  trackingCodes: string[];
+};
+
 let transporter: nodemailer.Transporter | null = null;
 
 const hasEmailTransportConfigured = () => {
@@ -62,6 +87,26 @@ const getFrontendRegistrationUrl = () => {
   return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/participantes`;
 };
 
+const getFrontendExhibitorsUrl = () => {
+  const frontendBaseUrl = env.corsAllowedOrigins[0];
+
+  if (!frontendBaseUrl) {
+    return "/inscripcion/expositores";
+  }
+
+  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/expositores`;
+};
+
+const getFrontendExhibitorsSecondInstallmentUrl = () => {
+  const frontendBaseUrl = env.corsAllowedOrigins[0];
+
+  if (!frontendBaseUrl) {
+    return "/inscripcion/expositores/segunda-cuota";
+  }
+
+  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/expositores/segunda-cuota`;
+};
+
 const getTransporter = () => {
   if (!hasEmailTransportConfigured()) {
     throw new Error("Email transport is not configured");
@@ -94,29 +139,49 @@ const buildEmailLayout = ({
   footer?: string;
 }) => {
   return `
-    <div style="margin:0;padding:32px 16px;background:#f5f5f4;">
-      <div style="max-width:680px;margin:0 auto;font-family:Arial,sans-serif;color:#1c1917;">
-        <div style="overflow:hidden;border:1px solid #e7e5e4;border-radius:28px;background:#ffffff;box-shadow:0 24px 60px -40px rgba(28,25,23,0.35);">
-          <div style="padding:28px 32px;background:linear-gradient(135deg,#ecfdf5 0%,#f8fafc 100%);border-bottom:1px solid #e7e5e4;">
-            <div style="display:inline-block;padding:6px 10px;border-radius:999px;background:#ffffff;border:1px solid #d6d3d1;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#047857;">
-              ${eyebrow}
-            </div>
-            <h1 style="margin:18px 0 10px;font-size:30px;line-height:1.15;font-weight:700;color:#1c1917;">
-              ${title}
-            </h1>
-            <p style="margin:0;font-size:15px;line-height:1.7;color:#57534e;">
-              ${intro}
-            </p>
-          </div>
-          <div style="padding:28px 32px;">
-            ${content}
-          </div>
-          <div style="padding:18px 32px;border-top:1px solid #e7e5e4;background:#fafaf9;font-size:13px;line-height:1.7;color:#78716c;">
-            ${footer ?? "Congreso Nacional de RCP"}
-          </div>
-        </div>
-      </div>
-    </div>
+    <!DOCTYPE html>
+    <html lang="es">
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>${title}</title>
+      </head>
+      <body style="margin:0;padding:0;background-color:#f5f5f4;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:0;padding:0;background-color:#f5f5f4;">
+          <tr>
+            <td align="center" style="padding:20px 12px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:680px;width:100%;background-color:#ffffff;border:1px solid #e7e5e4;">
+                <tr>
+                  <td style="padding:24px 20px;background-color:#f0fdf4;border-bottom:1px solid #e7e5e4;font-family:Arial,sans-serif;">
+                    <div style="display:inline-block;padding:6px 10px;background-color:#ffffff;border:1px solid #d6d3d1;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#047857;">
+                      ${eyebrow}
+                    </div>
+                    <div style="height:16px;line-height:16px;font-size:16px;">&nbsp;</div>
+                    <div style="font-size:28px;line-height:34px;font-weight:700;color:#1c1917;">
+                      ${title}
+                    </div>
+                    <div style="height:12px;line-height:12px;font-size:12px;">&nbsp;</div>
+                    <div style="font-size:15px;line-height:24px;color:#57534e;">
+                      ${intro}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:24px 20px;">
+                    ${content}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:18px 20px;background-color:#fafaf9;border-top:1px solid #e7e5e4;font-family:Arial,sans-serif;font-size:13px;line-height:21px;color:#78716c;">
+                    ${footer ?? "Congreso Nacional de RCP"}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
   `;
 };
 
@@ -134,18 +199,27 @@ const buildInfoGrid = (
       const valueColor = item.tone === "success" ? "#065f46" : "#1c1917";
 
       return `
-        <div style="min-width:220px;flex:1;padding:16px 18px;border-radius:18px;border:1px solid ${border};background:${background};">
-          <div style="font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#78716c;">${item.label}</div>
-          <div style="margin-top:8px;font-size:18px;line-height:1.45;font-weight:700;color:${valueColor};word-break:break-word;">${item.value}</div>
-        </div>
+        <tr>
+          <td style="padding:0 0 12px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background-color:${background};border:1px solid ${border};">
+              <tr>
+                <td style="padding:14px 16px;font-family:Arial,sans-serif;">
+                  <div style="font-size:11px;line-height:16px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:#78716c;">${item.label}</div>
+                  <div style="height:8px;line-height:8px;font-size:8px;">&nbsp;</div>
+                  <div style="font-size:18px;line-height:26px;font-weight:700;color:${valueColor};word-break:break-word;">${item.value}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
       `;
     })
     .join("");
 
   return `
-    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
       ${cards}
-    </div>
+    </table>
   `;
 };
 
@@ -159,21 +233,219 @@ const buildActionBlock = ({
   helper?: string;
 }) => {
   return `
-    <div style="margin-top:24px;padding:20px 22px;border-radius:20px;border:1px solid #e7e5e4;background:#fafaf9;">
-      <a href="${href}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#111827;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">
-        ${label}
-      </a>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px;width:100%;background-color:#fafaf9;border:1px solid #e7e5e4;">
+      <tr>
+        <td style="padding:20px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="background-color:#111827;">
+                <a href="${href}" style="display:inline-block;padding:12px 18px;font-family:Arial,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;">
+                  ${label}
+                </a>
+              </td>
+            </tr>
+          </table>
       ${
         helper
-          ? `<p style="margin:12px 0 0;font-size:13px;line-height:1.7;color:#57534e;">${helper}</p>`
+          ? `<div style="padding-top:12px;font-family:Arial,sans-serif;font-size:13px;line-height:21px;color:#57534e;">${helper}</div>`
           : ""
       }
-    </div>
+        </td>
+      </tr>
+    </table>
   `;
 };
 
 const buildParagraph = (text: string) => {
-  return `<p style="margin:0 0 14px;font-size:15px;line-height:1.75;color:#44403c;">${text}</p>`;
+  return `<div style="margin:0 0 14px;font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#44403c;">${text}</div>`;
+};
+
+const buildCommercialSubmissionConfirmationEmailHtml = ({
+  trackingCode,
+  commercialKindLabel,
+  commercialOptionLabel,
+  companyName,
+  paymentPlanLabel,
+  totalAmountExpected,
+  installmentAmountExpected,
+  discountAppliedAmount,
+  equipmentAdditionalAmount,
+  secondInstallmentDueAt,
+}: Omit<CommercialSubmissionConfirmationEmailInput, "to">) => {
+  return buildEmailLayout({
+    eyebrow: "Solicitud comercial recibida",
+    title: "Recibimos tu comprobante",
+    intro:
+      "Tu envio comercial quedo registrado y ahora pasa a revision manual por parte del comite organizador.",
+    content: `
+      ${buildInfoGrid([
+        {
+          label: "Codigo de seguimiento",
+          value: trackingCode,
+          tone: "success",
+        },
+        {
+          label: "Tipo",
+          value: commercialKindLabel,
+        },
+        {
+          label: "Opcion",
+          value: commercialOptionLabel,
+        },
+        {
+          label: "Empresa",
+          value: companyName,
+        },
+        {
+          label: "Modalidad",
+          value: paymentPlanLabel,
+        },
+        {
+          label: "Total esperado",
+          value: formatArsCurrency(totalAmountExpected),
+        },
+        ...(installmentAmountExpected !== null
+          ? [
+              {
+                label: "Importe de este envio",
+                value: formatArsCurrency(installmentAmountExpected),
+              },
+            ]
+          : []),
+        ...(discountAppliedAmount
+          ? [
+              {
+                label: "Descuento aplicado",
+                value: formatArsCurrency(discountAppliedAmount),
+                tone: "success" as const,
+              },
+            ]
+          : []),
+        ...(equipmentAdditionalAmount
+          ? [
+              {
+                label: "Adicional equipamiento",
+                value: formatArsCurrency(equipmentAdditionalAmount),
+              },
+            ]
+          : []),
+        ...(secondInstallmentDueAt
+          ? [
+              {
+                label: "Vencimiento cuota 2",
+                value: formatEmailDate(secondInstallmentDueAt),
+              },
+            ]
+          : []),
+      ])}
+      <div style="margin-top:22px;">
+        ${buildParagraph(
+          "Guarda este codigo de seguimiento. Te servira para cualquier consulta manual que el comite necesite resolver sobre esta contratacion.",
+        )}
+        ${
+          paymentPlanLabel === "2 cuotas"
+            ? buildActionBlock({
+                label: "Ir a segunda cuota de expositores",
+                href: getFrontendExhibitorsSecondInstallmentUrl(),
+                helper:
+                  "Cuando completes la transferencia restante, usa este acceso para informar la cuota 2 del stand.",
+              })
+            : ""
+        }
+      </div>
+    `,
+    footer:
+      "Este correo fue enviado automaticamente por el sistema comercial del Congreso Nacional de RCP.",
+  });
+};
+
+const buildCommercialStandDiscountCouponEmailHtml = ({
+  couponCode,
+  expiresAt,
+}: Omit<CommercialStandDiscountCouponEmailInput, "to">) => {
+  const exhibitorsUrl = getFrontendExhibitorsUrl();
+
+  return buildEmailLayout({
+    eyebrow: "Descuento para expositores",
+    title: "Tu cupon para stand ya esta listo",
+    intro:
+      "Generamos un cupon exclusivo para este email. Aplicalo al contratar tu stand antes de que venza.",
+    content: `
+      ${buildInfoGrid([
+        {
+          label: "Cupon",
+          value: couponCode,
+          tone: "success",
+        },
+        {
+          label: "Vence",
+          value: formatEmailDate(expiresAt),
+        },
+      ])}
+      <div style="margin-top:22px;">
+        ${buildParagraph(
+          "Si solicitas un nuevo cupon antes de usar este, el anterior queda invalidado automaticamente.",
+        )}
+        ${buildActionBlock({
+          label: "Ir a expositores",
+          href: exhibitorsUrl,
+          helper:
+            "Aplica el codigo con el mismo email habilitado para el descuento del stand.",
+        })}
+      </div>
+    `,
+    footer:
+      "Este beneficio aplica solo a expositores habilitados por el comite.",
+  });
+};
+
+const sendCommercialTrackingCodeRecoveryEmail = async ({
+  to,
+  trackingCodes,
+}: CommercialTrackingCodeRecoveryEmailInput) => {
+  const secondInstallmentUrl = getFrontendExhibitorsSecondInstallmentUrl();
+  const codesHtml = trackingCodes
+    .map(
+      (trackingCode) => `
+        <tr>
+          <td style="padding:0 0 12px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background-color:#ffffff;border:1px solid #e7e5e4;">
+              <tr>
+                <td style="padding:14px 16px;font-family:Arial,sans-serif;font-size:18px;line-height:26px;font-weight:700;letter-spacing:0.04em;color:#111827;">
+                  ${trackingCode}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  await getTransporter().sendMail({
+    from: env.gmailUser,
+    to,
+    subject: "Recuperacion de codigo para stands del Congreso",
+    html: buildEmailLayout({
+      eyebrow: "Recuperacion",
+      title: "Encontramos tus codigos de stand",
+      intro:
+        "Estas son las solicitudes de stand asociadas a este email que todavia pueden servirte para seguimiento o segunda cuota.",
+      content: `
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
+          ${codesHtml}
+        </table>
+        ${buildActionBlock({
+          label: "Abrir segunda cuota de expositores",
+          href: secondInstallmentUrl,
+          helper:
+            "Puedes usar cualquiera de estos codigos en la pantalla publica de segunda cuota para stands.",
+        })}
+      `,
+      footer:
+        "Si no solicitaste esta recuperacion, puedes ignorar este mensaje.",
+    }),
+  });
 };
 
 const sendInitialSubmissionConfirmationEmail = async ({
@@ -277,9 +549,17 @@ const sendTrackingCodeRecoveryEmail = async ({
   const codesHtml = trackingCodes
     .map(
       (trackingCode) => `
-        <div style="padding:14px 16px;border-radius:16px;border:1px solid #e7e5e4;background:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.04em;color:#111827;">
-          ${trackingCode}
-        </div>
+        <tr>
+          <td style="padding:0 0 12px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background-color:#ffffff;border:1px solid #e7e5e4;">
+              <tr>
+                <td style="padding:14px 16px;font-family:Arial,sans-serif;font-size:18px;line-height:26px;font-weight:700;letter-spacing:0.04em;color:#111827;">
+                  ${trackingCode}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
       `,
     )
     .join("");
@@ -294,9 +574,9 @@ const sendTrackingCodeRecoveryEmail = async ({
       intro:
         "Estas son las inscripciones asociadas a este email que todavia pueden serte utiles para seguimiento o segunda cuota.",
       content: `
-        <div style="display:grid;gap:12px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
           ${codesHtml}
-        </div>
+        </table>
         ${buildActionBlock({
           label: "Abrir pantalla de segunda cuota",
           href: secondInstallmentUrl,
@@ -356,8 +636,61 @@ const sendDiscountCouponEmail = async ({
   });
 };
 
+const sendCommercialSubmissionConfirmationEmail = async ({
+  to,
+  trackingCode,
+  commercialKindLabel,
+  commercialOptionLabel,
+  companyName,
+  paymentPlanLabel,
+  totalAmountExpected,
+  installmentAmountExpected,
+  discountAppliedAmount,
+  equipmentAdditionalAmount,
+  secondInstallmentDueAt,
+}: CommercialSubmissionConfirmationEmailInput) => {
+  await getTransporter().sendMail({
+    from: env.gmailUser,
+    to,
+    subject: "Recibimos tu solicitud comercial para el Congreso",
+    html: buildCommercialSubmissionConfirmationEmailHtml({
+      trackingCode,
+      commercialKindLabel,
+      commercialOptionLabel,
+      companyName,
+      paymentPlanLabel,
+      totalAmountExpected,
+      installmentAmountExpected,
+      discountAppliedAmount,
+      equipmentAdditionalAmount,
+      secondInstallmentDueAt,
+    }),
+  });
+};
+
+const sendCommercialStandDiscountCouponEmail = async ({
+  to,
+  couponCode,
+  expiresAt,
+}: CommercialStandDiscountCouponEmailInput) => {
+  await getTransporter().sendMail({
+    from: env.gmailUser,
+    to,
+    subject: "Tu cupon para stand del Congreso",
+    html: buildCommercialStandDiscountCouponEmailHtml({
+      couponCode,
+      expiresAt,
+    }),
+  });
+};
+
 export {
+  buildCommercialStandDiscountCouponEmailHtml,
+  buildCommercialSubmissionConfirmationEmailHtml,
   hasEmailTransportConfigured,
+  sendCommercialStandDiscountCouponEmail,
+  sendCommercialSubmissionConfirmationEmail,
+  sendCommercialTrackingCodeRecoveryEmail,
   sendDiscountCouponEmail,
   sendInitialSubmissionConfirmationEmail,
   sendTrackingCodeRecoveryEmail,

@@ -1,4 +1,11 @@
 import type {
+  CommercialAdditionalReceiptCreatedDto,
+  CommercialDiscountCouponRequestResponseDto,
+  CommercialDiscountCouponValidationResponseDto,
+  CommercialPricingCatalogDto,
+  CommercialSubmissionCreatedDto,
+  CommercialTrackingCodeRecoveryResponseDto,
+  PublicCommercialSubmissionStatusDto,
   PublicAdditionalReceiptCreatedDto,
   PublicDiscountCouponRequestResponseDto,
   PublicDiscountCouponValidationResponseDto,
@@ -43,8 +50,57 @@ const toPublicDiscountCouponValidationResponseDto = (
   return response;
 };
 
+const toCommercialPricingCatalogDto = (
+  pricingCatalog: CommercialPricingCatalogDto,
+): CommercialPricingCatalogDto => {
+  return pricingCatalog;
+};
+
+const toCommercialDiscountCouponRequestResponseDto = (
+  response: CommercialDiscountCouponRequestResponseDto,
+): CommercialDiscountCouponRequestResponseDto => {
+  return response;
+};
+
+const toCommercialDiscountCouponValidationResponseDto = (
+  response: CommercialDiscountCouponValidationResponseDto,
+): CommercialDiscountCouponValidationResponseDto => {
+  return response;
+};
+
+const toCommercialSubmissionCreatedDto = (
+  submission: CommercialSubmissionCreatedDto,
+): CommercialSubmissionCreatedDto => {
+  return submission;
+};
+
+const toCommercialAdditionalReceiptCreatedDto = (
+  receipt: CommercialAdditionalReceiptCreatedDto,
+): CommercialAdditionalReceiptCreatedDto => {
+  return receipt;
+};
+
+const toPublicCommercialSubmissionStatusDto = (
+  submission: PublicCommercialSubmissionStatusDto,
+): PublicCommercialSubmissionStatusDto => {
+  return submission;
+};
+
+const toCommercialTrackingCodeRecoveryResponseDto = (
+  response: CommercialTrackingCodeRecoveryResponseDto,
+): CommercialTrackingCodeRecoveryResponseDto => {
+  return response;
+};
+
 export {
+  toCommercialAdditionalReceiptCreatedDto,
+  toCommercialDiscountCouponRequestResponseDto,
+  toCommercialDiscountCouponValidationResponseDto,
+  toCommercialPricingCatalogDto,
+  toCommercialSubmissionCreatedDto,
+  toCommercialTrackingCodeRecoveryResponseDto,
   toPublicAdditionalReceiptCreatedDto,
+  toPublicCommercialSubmissionStatusDto,
   toPublicDiscountCouponRequestResponseDto,
   toPublicDiscountCouponValidationResponseDto,
   toPublicPricingCatalogDto,
