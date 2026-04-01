@@ -6,6 +6,11 @@ type InitialSubmissionConfirmationEmailInput = {
   trackingCode: string;
   registrationOptionLabel: string;
   paymentPlanLabel: string;
+  totalAmountExpected: number;
+  installmentAmountExpected: number | null;
+  discountAppliedPercentage: number | null;
+  discountAppliedAmount: number | null;
+  secondInstallmentDueAt: Date | null;
 };
 
 type TrackingCodeRecoveryEmailInput = {
@@ -13,11 +18,29 @@ type TrackingCodeRecoveryEmailInput = {
   trackingCodes: string[];
 };
 
+type DiscountCouponEmailInput = {
+  to: string;
+  couponCode: string;
+  expiresAt: Date;
+};
+
 let transporter: nodemailer.Transporter | null = null;
 
 const hasEmailTransportConfigured = () => {
   return Boolean(env.gmailUser && env.gmailAppPassword);
 };
+
+const formatArsCurrency = (value: number) =>
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const formatEmailDate = (value: Date) =>
+  value.toLocaleString("es-AR", {
+    timeZone: "America/Buenos_Aires",
+  });
 
 const getFrontendSecondInstallmentUrl = () => {
   const frontendBaseUrl = env.corsAllowedOrigins[0];
@@ -27,6 +50,16 @@ const getFrontendSecondInstallmentUrl = () => {
   }
 
   return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/segunda-cuota`;
+};
+
+const getFrontendRegistrationUrl = () => {
+  const frontendBaseUrl = env.corsAllowedOrigins[0];
+
+  if (!frontendBaseUrl) {
+    return "/inscripcion/participantes";
+  }
+
+  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/participantes`;
 };
 
 const getTransporter = () => {
@@ -47,33 +80,192 @@ const getTransporter = () => {
   return transporter;
 };
 
+const buildEmailLayout = ({
+  eyebrow,
+  title,
+  intro,
+  content,
+  footer,
+}: {
+  eyebrow: string;
+  title: string;
+  intro: string;
+  content: string;
+  footer?: string;
+}) => {
+  return `
+    <div style="margin:0;padding:32px 16px;background:#f5f5f4;">
+      <div style="max-width:680px;margin:0 auto;font-family:Arial,sans-serif;color:#1c1917;">
+        <div style="overflow:hidden;border:1px solid #e7e5e4;border-radius:28px;background:#ffffff;box-shadow:0 24px 60px -40px rgba(28,25,23,0.35);">
+          <div style="padding:28px 32px;background:linear-gradient(135deg,#ecfdf5 0%,#f8fafc 100%);border-bottom:1px solid #e7e5e4;">
+            <div style="display:inline-block;padding:6px 10px;border-radius:999px;background:#ffffff;border:1px solid #d6d3d1;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#047857;">
+              ${eyebrow}
+            </div>
+            <h1 style="margin:18px 0 10px;font-size:30px;line-height:1.15;font-weight:700;color:#1c1917;">
+              ${title}
+            </h1>
+            <p style="margin:0;font-size:15px;line-height:1.7;color:#57534e;">
+              ${intro}
+            </p>
+          </div>
+          <div style="padding:28px 32px;">
+            ${content}
+          </div>
+          <div style="padding:18px 32px;border-top:1px solid #e7e5e4;background:#fafaf9;font-size:13px;line-height:1.7;color:#78716c;">
+            ${footer ?? "Congreso Nacional de RCP"}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+const buildInfoGrid = (
+  items: Array<{
+    label: string;
+    value: string;
+    tone?: "default" | "success";
+  }>,
+) => {
+  const cards = items
+    .map((item) => {
+      const background = item.tone === "success" ? "#ecfdf5" : "#fafaf9";
+      const border = item.tone === "success" ? "#a7f3d0" : "#e7e5e4";
+      const valueColor = item.tone === "success" ? "#065f46" : "#1c1917";
+
+      return `
+        <div style="min-width:220px;flex:1;padding:16px 18px;border-radius:18px;border:1px solid ${border};background:${background};">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#78716c;">${item.label}</div>
+          <div style="margin-top:8px;font-size:18px;line-height:1.45;font-weight:700;color:${valueColor};word-break:break-word;">${item.value}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+      ${cards}
+    </div>
+  `;
+};
+
+const buildActionBlock = ({
+  label,
+  href,
+  helper,
+}: {
+  label: string;
+  href: string;
+  helper?: string;
+}) => {
+  return `
+    <div style="margin-top:24px;padding:20px 22px;border-radius:20px;border:1px solid #e7e5e4;background:#fafaf9;">
+      <a href="${href}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#111827;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">
+        ${label}
+      </a>
+      ${
+        helper
+          ? `<p style="margin:12px 0 0;font-size:13px;line-height:1.7;color:#57534e;">${helper}</p>`
+          : ""
+      }
+    </div>
+  `;
+};
+
+const buildParagraph = (text: string) => {
+  return `<p style="margin:0 0 14px;font-size:15px;line-height:1.75;color:#44403c;">${text}</p>`;
+};
+
 const sendInitialSubmissionConfirmationEmail = async ({
   to,
   trackingCode,
   registrationOptionLabel,
   paymentPlanLabel,
+  totalAmountExpected,
+  installmentAmountExpected,
+  discountAppliedPercentage,
+  discountAppliedAmount,
+  secondInstallmentDueAt,
 }: InitialSubmissionConfirmationEmailInput) => {
   const secondInstallmentUrl = getFrontendSecondInstallmentUrl();
+
+  const infoBlocks = [
+    {
+      label: "Codigo de seguimiento",
+      value: trackingCode,
+      tone: "success" as const,
+    },
+    {
+      label: "Inscripcion",
+      value: registrationOptionLabel,
+    },
+    {
+      label: "Modalidad",
+      value: paymentPlanLabel,
+    },
+    {
+      label: "Total esperado",
+      value: formatArsCurrency(totalAmountExpected),
+    },
+    ...(installmentAmountExpected !== null
+      ? [
+          {
+            label: "Importe de este envio",
+            value: formatArsCurrency(installmentAmountExpected),
+          },
+        ]
+      : []),
+    ...(discountAppliedPercentage && discountAppliedAmount
+      ? [
+          {
+            label: "Descuento aplicado",
+            value: `${discountAppliedPercentage}% OFF (${formatArsCurrency(
+              discountAppliedAmount,
+            )})`,
+            tone: "success" as const,
+          },
+        ]
+      : []),
+    ...(secondInstallmentDueAt
+      ? [
+          {
+            label: "Vencimiento cuota 2",
+            value: formatEmailDate(secondInstallmentDueAt),
+          },
+        ]
+      : []),
+  ];
 
   await getTransporter().sendMail({
     from: env.gmailUser,
     to,
-    subject: "Recibimos tu inscripción al Congreso",
-    html: `
-      <div style="font-family: Arial, sans-serif; color: #1c1917; line-height: 1.6;">
-        <h2 style="margin-bottom: 12px;">Recibimos tu inscripción</h2>
-        <p>Tu comprobante fue recibido y quedó pendiente de revisión manual por parte del comité organizador.</p>
-        <p><strong>Código de seguimiento:</strong> ${trackingCode}</p>
-        <p><strong>Opción elegida:</strong> ${registrationOptionLabel}</p>
-        <p><strong>Modalidad de pago:</strong> ${paymentPlanLabel}</p>
-        <p>Guarda este código para futuras consultas.</p>
-        ${
-          paymentPlanLabel === "2 cuotas"
-            ? `<p>Si elegiste pagar en cuotas, este código también te servirá para cargar la segunda cuota desde <a href="${secondInstallmentUrl}">${secondInstallmentUrl}</a>.</p>`
-            : ""
-        }
-      </div>
-    `,
+    subject: "Recibimos tu inscripcion al Congreso",
+    html: buildEmailLayout({
+      eyebrow: "Inscripcion recibida",
+      title: "Recibimos tu comprobante",
+      intro:
+        "Tu envio quedo registrado y ahora pasa a revision manual por parte del comite organizador.",
+      content: `
+        ${buildInfoGrid(infoBlocks)}
+        <div style="margin-top:22px;">
+          ${buildParagraph(
+            "Guarda este codigo de seguimiento. Lo vas a necesitar para consultar el estado de la inscripcion y, si corresponde, para informar una segunda cuota.",
+          )}
+          ${
+            paymentPlanLabel === "2 cuotas"
+              ? buildActionBlock({
+                  label: "Ir a segunda cuota",
+                  href: secondInstallmentUrl,
+                  helper:
+                    "Si elegiste pagar en 2 cuotas, usa este acceso cuando completes la transferencia restante.",
+                })
+              : ""
+          }
+        </div>
+      `,
+      footer:
+        "Este correo fue enviado automaticamente por el sistema de inscripciones del Congreso Nacional de RCP.",
+    }),
   });
 };
 
@@ -82,27 +274,91 @@ const sendTrackingCodeRecoveryEmail = async ({
   trackingCodes,
 }: TrackingCodeRecoveryEmailInput) => {
   const secondInstallmentUrl = getFrontendSecondInstallmentUrl();
-  const trackingCodeList = trackingCodes
-    .map((trackingCode) => `<li><strong>${trackingCode}</strong></li>`)
+  const codesHtml = trackingCodes
+    .map(
+      (trackingCode) => `
+        <div style="padding:14px 16px;border-radius:16px;border:1px solid #e7e5e4;background:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.04em;color:#111827;">
+          ${trackingCode}
+        </div>
+      `,
+    )
     .join("");
 
   await getTransporter().sendMail({
     from: env.gmailUser,
     to,
-    subject: "Recuperación de código de inscripción",
-    html: `
-      <div style="font-family: Arial, sans-serif; color: #1c1917; line-height: 1.6;">
-        <h2 style="margin-bottom: 12px;">Recuperación de código de inscripción</h2>
-        <p>Encontramos una o más inscripciones asociadas a este email que todavía pueden continuar el flujo de segunda cuota.</p>
-        <ul>${trackingCodeList}</ul>
-        <p>Puedes usar cualquiera de estos códigos en <a href="${secondInstallmentUrl}">${secondInstallmentUrl}</a>.</p>
-      </div>
-    `,
+    subject: "Recuperacion de codigo de inscripcion",
+    html: buildEmailLayout({
+      eyebrow: "Recuperacion",
+      title: "Encontramos tus codigos",
+      intro:
+        "Estas son las inscripciones asociadas a este email que todavia pueden serte utiles para seguimiento o segunda cuota.",
+      content: `
+        <div style="display:grid;gap:12px;">
+          ${codesHtml}
+        </div>
+        ${buildActionBlock({
+          label: "Abrir pantalla de segunda cuota",
+          href: secondInstallmentUrl,
+          helper:
+            "Puedes usar cualquiera de estos codigos en la pantalla publica de segunda cuota.",
+        })}
+      `,
+      footer:
+        "Si no solicitaste esta recuperacion, puedes ignorar este mensaje.",
+    }),
+  });
+};
+
+const sendDiscountCouponEmail = async ({
+  to,
+  couponCode,
+  expiresAt,
+}: DiscountCouponEmailInput) => {
+  const registrationUrl = getFrontendRegistrationUrl();
+
+  await getTransporter().sendMail({
+    from: env.gmailUser,
+    to,
+    subject: "Tu cupon de descuento para el Congreso",
+    html: buildEmailLayout({
+      eyebrow: "Descuento 20% OFF",
+      title: "Tu cupon ya esta listo",
+      intro:
+        "Generamos un cupon exclusivo para este email. Aplicalo en la inscripcion antes de que venza.",
+      content: `
+        ${buildInfoGrid([
+          {
+            label: "Cupon",
+            value: couponCode,
+            tone: "success",
+          },
+          {
+            label: "Vence",
+            value: formatEmailDate(expiresAt),
+          },
+        ])}
+        <div style="margin-top:22px;">
+          ${buildParagraph(
+            "Si solicitas un nuevo cupon antes de usar este, el anterior queda invalidado automaticamente.",
+          )}
+          ${buildActionBlock({
+            label: "Ir a la inscripcion",
+            href: registrationUrl,
+            helper:
+              "Aplica el codigo dentro del formulario con el mismo email con el que pediste el descuento.",
+          })}
+        </div>
+      `,
+      footer:
+        "El descuento esta reservado para participantes habilitados del primer congreso.",
+    }),
   });
 };
 
 export {
   hasEmailTransportConfigured,
+  sendDiscountCouponEmail,
   sendInitialSubmissionConfirmationEmail,
   sendTrackingCodeRecoveryEmail,
 };

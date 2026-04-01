@@ -7,6 +7,11 @@ import type {
 import type { PublicSubmissionStatusDto } from "./dto.types";
 import type { PublicTrackingCodeRecoveryResponseDto } from "./dto.types";
 import type { PublicPendingSecondInstallmentLookupResponseDto } from "./dto.types";
+import type { PublicPricingCatalogDto } from "./dto.types";
+import type {
+  PublicDiscountCouponRequestResponseDto,
+  PublicDiscountCouponValidationResponseDto,
+} from "./dto.types";
 
 export type CreateInitialSubmissionInput = {
   firstName: string;
@@ -18,6 +23,7 @@ export type CreateInitialSubmissionInput = {
   paymentPlanType: PaymentPlanType;
   installmentNumber: number;
   amountReported: number;
+  discountCouponCode?: string;
   paymentDate?: Date;
   notes?: string;
 };
@@ -33,6 +39,8 @@ export type CreateInitialSubmissionResult = {
   };
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
   receipt: {
     installmentNumber: number;
     status: PaymentReceiptStatus;
@@ -54,6 +62,9 @@ export type CreateAdditionalReceiptResult = {
   status: RegistrationStatus;
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  secondInstallmentExpired: boolean;
   receipt: {
     installmentNumber: number;
     status: PaymentReceiptStatus;
@@ -77,3 +88,20 @@ export type FindPendingSecondInstallmentInput = {
 
 export type FindPendingSecondInstallmentResult =
   PublicPendingSecondInstallmentLookupResponseDto;
+
+export type PublicPricingCatalogResult = PublicPricingCatalogDto;
+
+export type RequestDiscountCouponInput = {
+  email: string;
+};
+
+export type RequestDiscountCouponResult =
+  PublicDiscountCouponRequestResponseDto;
+
+export type ValidateDiscountCouponInput = {
+  email: string;
+  couponCode: string;
+};
+
+export type ValidateDiscountCouponResult =
+  PublicDiscountCouponValidationResponseDto;

@@ -67,9 +67,18 @@ export type AdminSubmissionDetailDto = {
   registrationOptionCode: RegistrationOptionCode;
   registrationOptionLabelSnapshot: string;
   currencyCode: string;
+  baseAmountExpected: number | null;
+  discountAppliedPercentage: number | null;
+  discountAppliedAmount: number | null;
+  discountEligibleEmailNormalized: string | null;
+  discountCouponCode: string | null;
   totalAmountExpected: number;
+  installmentsAllowed: boolean;
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  secondInstallmentExpired: boolean;
   status: RegistrationStatus;
   notes: string | null;
   internalNote: string | null;
@@ -98,6 +107,8 @@ export type PublicSubmissionCreatedDto = {
   };
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
   receipt: {
     installmentNumber: number;
     status: PaymentReceiptStatus;
@@ -112,6 +123,9 @@ export type PublicAdditionalReceiptCreatedDto = {
   status: RegistrationStatus;
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  secondInstallmentExpired: boolean;
   receipt: {
     installmentNumber: number;
     status: PaymentReceiptStatus;
@@ -133,6 +147,10 @@ export type PublicSubmissionStatusDto = {
   };
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  secondInstallmentExpired: boolean;
+  secondInstallmentUploadAllowed: boolean;
   submittedReceiptsCount: number;
   approvedReceiptsCount: number;
   pendingReceiptsCount: number;
@@ -152,5 +170,45 @@ export type PublicPendingSecondInstallmentLookupResponseDto = {
   found: boolean;
   trackingCode: string | null;
   participantName: string | null;
+  secondInstallmentDueAt: Date | null;
+  secondInstallmentExpired: boolean;
+  secondInstallmentUploadAllowed: boolean;
   message: string;
+};
+
+export type PublicPricingPlanDto = {
+  type: PaymentPlanType;
+  label: string;
+  installmentCount: number;
+  baseInstallmentAmount: number;
+  discountedInstallmentAmount: number;
+};
+
+export type PublicPricingOptionDto = {
+  code: RegistrationOptionCode;
+  label: string;
+  baseTotalAmount: number;
+  discountedTotalAmount: number;
+  paymentPlans: PublicPricingPlanDto[];
+};
+
+export type PublicPricingCatalogDto = {
+  discountPercentage: number;
+  installmentsAvailable: boolean;
+  installmentsAvailableUntil: Date;
+  installmentsTimezone: string;
+  options: PublicPricingOptionDto[];
+};
+
+export type PublicDiscountCouponRequestResponseDto = {
+  issued: boolean;
+  message: string;
+  expiresAt: Date | null;
+};
+
+export type PublicDiscountCouponValidationResponseDto = {
+  valid: boolean;
+  message: string;
+  discountPercentage: number | null;
+  expiresAt: Date | null;
 };

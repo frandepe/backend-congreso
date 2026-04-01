@@ -45,6 +45,12 @@ const submissionBodySchema = z.object({
   paymentPlanType: z.nativeEnum(PaymentPlanType),
   installmentNumber: z.coerce.number().int().positive(),
   amountReported: z.coerce.number().positive(),
+  discountCouponCode: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
   paymentDate: z
     .preprocess(parseOptionalDate, z.date().optional()),
   notes: z
@@ -76,6 +82,23 @@ const recoverTrackingCodeBodySchema = z.object({
     .transform((value) => value.toLowerCase()),
 });
 
+const requestDiscountCouponBodySchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email()
+    .transform((value) => value.toLowerCase()),
+});
+
+const validateDiscountCouponBodySchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email()
+    .transform((value) => value.toLowerCase()),
+  couponCode: z.string().trim().min(1),
+});
+
 const pendingSecondInstallmentLookupBodySchema = z
   .object({
     email: z
@@ -97,8 +120,10 @@ const pendingSecondInstallmentLookupBodySchema = z
 export {
   additionalReceiptBodySchema,
   pendingSecondInstallmentLookupBodySchema,
+  requestDiscountCouponBodySchema,
   recoverTrackingCodeBodySchema,
   submissionBodySchema,
   submissionIdParamsSchema,
   submissionStatusParamsSchema,
+  validateDiscountCouponBodySchema,
 };

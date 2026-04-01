@@ -34,6 +34,13 @@ enum PaymentReceiptStatus {
   REJECTED
 }
 
+enum DiscountCouponStatus {
+  ISSUED
+  INVALIDATED
+  EXPIRED
+  USED
+}
+
 model AdminUser {
   id                    String                     @id @default(cuid())
   email                 String                     @unique
@@ -56,15 +63,23 @@ model RegistrationSubmission {
   registrationOptionCode          RegistrationOptionCode
   registrationOptionLabelSnapshot String
   currencyCode                    String                     @default("ARS")
+  baseAmountExpected              Decimal?                   @db.Decimal(10, 2)
+  discountAppliedPercentage       Int?
+  discountAppliedAmount           Decimal?                   @db.Decimal(10, 2)
+  discountEligibleEmailNormalized String?
   totalAmountExpected             Decimal                    @db.Decimal(10, 2)
+  installmentsAllowed             Boolean                    @default(false)
   paymentPlanType                 PaymentPlanType
   installmentCountExpected        Int
+  installmentAmountExpected       Decimal?                   @db.Decimal(10, 2)
+  secondInstallmentDueAt          DateTime?
   status                          RegistrationStatus         @default(PENDING_REVIEW)
   notes                           String?
   internalNote                    String?
   reviewedAt                      DateTime?
   reviewedByAdminId               String?
   reviewedByAdmin                 AdminUser?                 @relation("RegistrationReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  usedDiscountCoupon              DiscountCoupon?            @relation("DiscountCouponUsedBySubmission")
   paymentReceipts                 PaymentReceiptSubmission[]
   createdAt                       DateTime                   @default(now())
   updatedAt                       DateTime                   @updatedAt
@@ -75,6 +90,31 @@ model RegistrationSubmission {
   @@index([email])
   @@index([registrationOptionCode])
   @@index([status, createdAt])
+}
+
+model DiscountEligibleParticipant {
+  id              String   @id @default(cuid())
+  emailNormalized String   @unique
+  emailOriginal   String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model DiscountCoupon {
+  id                 String               @id @default(cuid())
+  code               String               @unique
+  emailNormalized    String
+  status             DiscountCouponStatus @default(ISSUED)
+  expiresAt          DateTime
+  usedAt             DateTime?
+  usedBySubmissionId String?              @unique
+  usedBySubmission   RegistrationSubmission? @relation("DiscountCouponUsedBySubmission", fields: [usedBySubmissionId], references: [id], onDelete: SetNull)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([emailNormalized, createdAt])
+  @@index([status])
 }
 
 model PaymentReceiptSubmission {

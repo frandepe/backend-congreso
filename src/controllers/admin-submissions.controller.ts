@@ -16,6 +16,7 @@ const listAdminSubmissionsController = async (
     status: req.query.status as string | undefined,
     registrationOptionCode: req.query.registrationOptionCode as string | undefined,
     paymentPlanType: req.query.paymentPlanType as string | undefined,
+    hasDiscountCoupon: req.query.hasDiscountCoupon as string | undefined,
   });
 
   sendSuccess(res, result.items, 200, result.meta);

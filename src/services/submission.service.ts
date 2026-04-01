@@ -1,6 +1,9 @@
-import { PaymentReceiptStatus, RegistrationStatus } from "@prisma/client";
+import { PaymentReceiptStatus, Prisma, RegistrationStatus } from "@prisma/client";
 import {
   toPublicAdditionalReceiptCreatedDto,
+  toPublicDiscountCouponRequestResponseDto,
+  toPublicDiscountCouponValidationResponseDto,
+  toPublicPricingCatalogDto,
   toPublicSubmissionCreatedDto,
   toPublicSubmissionStatusDto,
 } from "../mappers/submission.mapper";
@@ -15,9 +18,21 @@ import {
   sendTrackingCodeRecoveryEmail,
 } from "./email.service";
 import {
-  getExpectedInstallmentAmount,
+  requestDiscountCoupon,
+  resolveCouponForSubmission,
+  validateDiscountCoupon,
+} from "./discount-coupon.service";
+import {
+  assertPaymentPlanAllowedForOption,
+  buildPricingSummary,
+  DEFAULT_DISCOUNT_PERCENTAGE,
   getInstallmentCountExpected,
+  getAllowedPaymentPlanTypes,
+  getPaymentPlanDefinition,
   getRegistrationOption,
+  INSTALLMENTS_AVAILABLE_UNTIL,
+  INSTALLMENTS_TIMEZONE,
+  isInstallmentsAvailable,
 } from "../config/registration-options";
 import { HttpError } from "../utils/http-error";
 import type {
@@ -27,9 +42,14 @@ import type {
   CreateInitialSubmissionResult,
   FindPendingSecondInstallmentInput,
   FindPendingSecondInstallmentResult,
+  PublicPricingCatalogResult,
   PublicSubmissionStatusResult,
+  RequestDiscountCouponInput,
+  RequestDiscountCouponResult,
   RecoverTrackingCodeInput,
   RecoverTrackingCodeResult,
+  ValidateDiscountCouponInput,
+  ValidateDiscountCouponResult,
 } from "../types/submission.types";
 import {
   formatTrackingCode,
@@ -37,9 +57,41 @@ import {
 } from "../utils/tracking-code";
 
 const nowMs = () => performance.now();
+const SECOND_INSTALLMENT_CONTACT_EMAIL = "congresonacionalrcp@gmail.com";
+const SECOND_INSTALLMENT_CONTACT_WHATSAPP = "2392-460227";
+
+const getSecondInstallmentExpiredMessage = () =>
+  `Se venció el plazo para informar la segunda cuota. Comunicate a ${SECOND_INSTALLMENT_CONTACT_EMAIL} o por WhatsApp al ${SECOND_INSTALLMENT_CONTACT_WHATSAPP}.`;
 
 const getElapsedMs = (startedAt: number) =>
   Number((nowMs() - startedAt).toFixed(1));
+
+const resolveSecondInstallmentDueAt = (input: {
+  createdAt: Date;
+  secondInstallmentDueAt?: Date | null;
+  paymentPlanType: "ONE_PAYMENT" | "TWO_INSTALLMENTS";
+}) => {
+  if (input.paymentPlanType !== "TWO_INSTALLMENTS") {
+    return null;
+  }
+
+  if (input.secondInstallmentDueAt) {
+    return input.secondInstallmentDueAt;
+  }
+
+  const fallbackDueAt = new Date(input.createdAt);
+  fallbackDueAt.setDate(fallbackDueAt.getDate() + 30);
+
+  return fallbackDueAt;
+};
+
+const isSecondInstallmentExpired = (dueAt: Date | null, now: Date = new Date()) => {
+  if (!dueAt) {
+    return false;
+  }
+
+  return now.getTime() > dueAt.getTime();
+};
 
 const logInitialSubmissionTiming = (data: {
   registrationOptionCode: string;
@@ -62,6 +114,11 @@ const dispatchInitialSubmissionConfirmationEmail = (input: {
   trackingCode: string;
   registrationOptionLabel: string;
   paymentPlanLabel: string;
+  totalAmountExpected: number;
+  installmentAmountExpected: number | null;
+  discountAppliedPercentage: number | null;
+  discountAppliedAmount: number | null;
+  secondInstallmentDueAt: Date | null;
 }) => {
   setImmediate(async () => {
     const emailStartedAt = nowMs();
@@ -98,25 +155,13 @@ const createInitialSubmission = async (
     );
   }
 
-  const registrationOption = getRegistrationOption(
+  const registrationReferenceDate = new Date();
+  assertPaymentPlanAllowedForOption(
     input.registrationOptionCode,
-  );
-  const totalAmountExpected = registrationOption.totalAmountExpected;
-  const installmentCountExpected = getInstallmentCountExpected(
     input.paymentPlanType,
+    registrationReferenceDate,
   );
-  const expectedInstallmentAmount = getExpectedInstallmentAmount(
-    totalAmountExpected,
-    input.paymentPlanType,
-  );
-
-  if (input.amountReported !== expectedInstallmentAmount) {
-    throw new HttpError(
-      400,
-      "INVALID_AMOUNT_REPORTED",
-      "Invalid reported amount",
-    );
-  }
+  const registrationOption = getRegistrationOption(input.registrationOptionCode);
 
   const uploadStartedAt = nowMs();
   const uploadedReceipt = await uploadReceiptBuffer(file);
@@ -125,6 +170,27 @@ const createInitialSubmission = async (
   try {
     const transactionStartedAt = nowMs();
     const result = await prisma.$transaction(async (tx) => {
+      const resolvedCoupon = await resolveCouponForSubmission({
+        tx,
+        email: input.email,
+        couponCode: input.discountCouponCode,
+      });
+      const discountPercentage = resolvedCoupon?.discountPercentage ?? 0;
+      const pricingSummary = buildPricingSummary({
+        registrationOptionCode: input.registrationOptionCode,
+        paymentPlanType: input.paymentPlanType,
+        discountPercentage,
+        referenceDate: registrationReferenceDate,
+      });
+
+      if (input.amountReported !== pricingSummary.installmentAmount) {
+        throw new HttpError(
+          400,
+          "INVALID_AMOUNT_REPORTED",
+          "Invalid reported amount",
+        );
+      }
+
       const registrationInsertStartedAt = nowMs();
       const registrationSubmission = await tx.registrationSubmission.create({
         data: {
@@ -136,9 +202,19 @@ const createInitialSubmission = async (
           registrationOptionCode: input.registrationOptionCode,
           registrationOptionLabelSnapshot: registrationOption.label,
           currencyCode: "ARS",
-          totalAmountExpected,
+          baseAmountExpected: pricingSummary.registrationOption.totalAmountExpected,
+          discountAppliedPercentage:
+            discountPercentage > 0 ? discountPercentage : null,
+          discountAppliedAmount:
+            discountPercentage > 0 ? pricingSummary.discountAppliedAmount : null,
+          discountEligibleEmailNormalized:
+            resolvedCoupon?.emailNormalized ?? null,
+          totalAmountExpected: pricingSummary.finalTotalAmount,
+          installmentsAllowed: pricingSummary.installmentsAllowed,
           paymentPlanType: input.paymentPlanType,
-          installmentCountExpected,
+          installmentCountExpected: pricingSummary.installmentCountExpected,
+          installmentAmountExpected: pricingSummary.installmentAmount,
+          secondInstallmentDueAt: pricingSummary.secondInstallmentDueAt,
           status: RegistrationStatus.PENDING_REVIEW,
           notes: input.notes,
         },
@@ -162,6 +238,19 @@ const createInitialSubmission = async (
       });
       const receiptInsertMs = getElapsedMs(receiptInsertStartedAt);
 
+      if (resolvedCoupon) {
+        await (tx as any).discountCoupon.update({
+          where: {
+            id: resolvedCoupon.id,
+          },
+          data: {
+            status: "USED",
+            usedAt: new Date(),
+            usedBySubmissionId: registrationSubmission.id,
+          },
+        });
+      }
+
       return {
         registrationSubmission,
         registrationInsertMs,
@@ -171,6 +260,9 @@ const createInitialSubmission = async (
     const transactionMs = getElapsedMs(transactionStartedAt);
 
     const trackingCode = formatTrackingCode(result.registrationSubmission.id);
+    const createdSubmissionSecondInstallmentDueAt = (
+      result.registrationSubmission as any
+    ).secondInstallmentDueAt as Date | null | undefined;
     const paymentPlanLabel =
       input.paymentPlanType === "TWO_INSTALLMENTS" ? "2 cuotas" : "1 pago";
 
@@ -192,6 +284,19 @@ const createInitialSubmission = async (
         trackingCode,
         registrationOptionLabel: registrationOption.label,
         paymentPlanLabel,
+        totalAmountExpected: Number(result.registrationSubmission.totalAmountExpected),
+        installmentAmountExpected:
+          result.registrationSubmission.installmentAmountExpected !== null
+            ? Number(result.registrationSubmission.installmentAmountExpected)
+            : null,
+        discountAppliedPercentage:
+          result.registrationSubmission.discountAppliedPercentage ?? null,
+        discountAppliedAmount:
+          result.registrationSubmission.discountAppliedAmount !== null
+            ? Number(result.registrationSubmission.discountAppliedAmount)
+            : null,
+        secondInstallmentDueAt:
+          createdSubmissionSecondInstallmentDueAt ?? null,
       });
     }
 
@@ -202,10 +307,16 @@ const createInitialSubmission = async (
       registrationOption: {
         code: input.registrationOptionCode,
         label: registrationOption.label,
-        totalAmountExpected,
+        totalAmountExpected: Number(result.registrationSubmission.totalAmountExpected),
       },
-      paymentPlanType: input.paymentPlanType,
-      installmentCountExpected,
+      paymentPlanType: result.registrationSubmission.paymentPlanType,
+      installmentCountExpected: result.registrationSubmission.installmentCountExpected,
+      installmentAmountExpected:
+        result.registrationSubmission.installmentAmountExpected !== null
+          ? Number(result.registrationSubmission.installmentAmountExpected)
+          : null,
+      secondInstallmentDueAt:
+        createdSubmissionSecondInstallmentDueAt ?? null,
       receipt: {
         installmentNumber: input.installmentNumber,
         status: PaymentReceiptStatus.PENDING_REVIEW,
@@ -247,7 +358,7 @@ const createAdditionalReceipt = async (
     throw new HttpError(
       400,
       "PAYMENT_PLAN_DOES_NOT_ALLOW_ADDITIONAL_RECEIPTS",
-      "This submission does not allow an additional receipt",
+      "Este envío no permite añadir un recibo adicional",
     );
   }
 
@@ -255,7 +366,7 @@ const createAdditionalReceipt = async (
     throw new HttpError(
       400,
       "INVALID_INSTALLMENT_NUMBER",
-      "Additional receipt must use installment number 2",
+      "El recibo adicional debe llevar el número de plazo 2",
     );
   }
 
@@ -263,7 +374,7 @@ const createAdditionalReceipt = async (
     throw new HttpError(
       400,
       "INVALID_INSTALLMENT_NUMBER",
-      "Installment number exceeds the expected installment count",
+      "El número de cuotas supera el número de cuotas previsto",
     );
   }
 
@@ -275,14 +386,37 @@ const createAdditionalReceipt = async (
     throw new HttpError(
       409,
       "INSTALLMENT_ALREADY_SUBMITTED",
-      "This installment has already been submitted",
+      "Este plazo ya ha sido enviado",
     );
   }
 
-  const expectedInstallmentAmount = getExpectedInstallmentAmount(
-    Number(existingSubmission.totalAmountExpected),
-    existingSubmission.paymentPlanType,
+  const existingSubmissionInstallmentAmount = (existingSubmission as any)
+    .installmentAmountExpected as Prisma.Decimal | null | undefined;
+  const existingSubmissionSecondInstallmentDueAt = (existingSubmission as any)
+    .secondInstallmentDueAt as Date | null | undefined;
+  const resolvedSecondInstallmentDueAt = resolveSecondInstallmentDueAt({
+    createdAt: existingSubmission.createdAt,
+    secondInstallmentDueAt: existingSubmissionSecondInstallmentDueAt ?? null,
+    paymentPlanType: existingSubmission.paymentPlanType,
+  });
+  const secondInstallmentExpired = isSecondInstallmentExpired(
+    resolvedSecondInstallmentDueAt,
   );
+  const expectedInstallmentAmount =
+    existingSubmissionInstallmentAmount != null
+      ? Number(existingSubmissionInstallmentAmount)
+      : Number(existingSubmission.totalAmountExpected);
+
+  if (secondInstallmentExpired) {
+    throw new HttpError(
+      409,
+      "SECOND_INSTALLMENT_EXPIRED",
+      getSecondInstallmentExpiredMessage(),
+      {
+        secondInstallmentDueAt: resolvedSecondInstallmentDueAt,
+      },
+    );
+  }
 
   if (input.amountReported !== expectedInstallmentAmount) {
     throw new HttpError(
@@ -332,6 +466,13 @@ const createAdditionalReceipt = async (
       status: result.registrationSubmission.status,
       paymentPlanType: existingSubmission.paymentPlanType,
       installmentCountExpected: existingSubmission.installmentCountExpected,
+      installmentAmountExpected:
+        existingSubmissionInstallmentAmount != null
+          ? Number(existingSubmissionInstallmentAmount)
+          : null,
+      secondInstallmentDueAt:
+        resolvedSecondInstallmentDueAt,
+      secondInstallmentExpired,
       receipt: {
         installmentNumber: result.paymentReceipt.installmentNumber,
         status: result.paymentReceipt.status,
@@ -388,6 +529,20 @@ const getPublicSubmissionStatus = async (
   const pendingReceiptsCount = submission.paymentReceipts.filter(
     (receipt) => receipt.status === PaymentReceiptStatus.PENDING_REVIEW,
   ).length;
+  const submissionSecondInstallmentDueAt = (submission as any)
+    .secondInstallmentDueAt as Date | null | undefined;
+  const resolvedSecondInstallmentDueAt = resolveSecondInstallmentDueAt({
+    createdAt: submission.createdAt,
+    secondInstallmentDueAt: submissionSecondInstallmentDueAt ?? null,
+    paymentPlanType: submission.paymentPlanType,
+  });
+  const secondInstallmentExpired = isSecondInstallmentExpired(
+    resolvedSecondInstallmentDueAt,
+  );
+  const secondInstallmentUploadAllowed =
+    submission.paymentPlanType === "TWO_INSTALLMENTS" &&
+    submission.paymentReceipts.length < submission.installmentCountExpected &&
+    !secondInstallmentExpired;
 
   return toPublicSubmissionStatusDto({
     registrationId: submission.id,
@@ -402,6 +557,13 @@ const getPublicSubmissionStatus = async (
     },
     paymentPlanType: submission.paymentPlanType,
     installmentCountExpected: submission.installmentCountExpected,
+    installmentAmountExpected:
+      submission.installmentAmountExpected !== null
+        ? Number(submission.installmentAmountExpected)
+        : null,
+    secondInstallmentDueAt: resolvedSecondInstallmentDueAt,
+    secondInstallmentExpired,
+    secondInstallmentUploadAllowed,
     submittedReceiptsCount: submission.paymentReceipts.length,
     approvedReceiptsCount,
     pendingReceiptsCount,
@@ -461,6 +623,9 @@ const findPendingSecondInstallment = async ({
       found: false,
       trackingCode: null,
       participantName: null,
+      secondInstallmentDueAt: null,
+      secondInstallmentExpired: false,
+      secondInstallmentUploadAllowed: false,
       message: "Sin datos suficientes para verificar una segunda cuota.",
     };
   }
@@ -491,23 +656,122 @@ const findPendingSecondInstallment = async ({
       found: false,
       trackingCode: null,
       participantName: null,
+      secondInstallmentDueAt: null,
+      secondInstallmentExpired: false,
+      secondInstallmentUploadAllowed: false,
       message: "No encontramos una segunda cuota pendiente para esos datos.",
     };
   }
+
+  const matchedSubmissionSecondInstallmentDueAt = (matchedSubmission as any)
+    .secondInstallmentDueAt as Date | null | undefined;
+  const resolvedSecondInstallmentDueAt = resolveSecondInstallmentDueAt({
+    createdAt: matchedSubmission.createdAt,
+    secondInstallmentDueAt: matchedSubmissionSecondInstallmentDueAt ?? null,
+    paymentPlanType: matchedSubmission.paymentPlanType,
+  });
+  const secondInstallmentExpired = isSecondInstallmentExpired(
+    resolvedSecondInstallmentDueAt,
+  );
+  const secondInstallmentUploadAllowed = !secondInstallmentExpired;
 
   return {
     found: true,
     trackingCode: formatTrackingCode(matchedSubmission.id),
     participantName: `${matchedSubmission.firstName} ${matchedSubmission.lastName}`,
-    message:
-      "Encontramos una inscripcion previa en 2 cuotas con segunda cuota pendiente.",
+    secondInstallmentDueAt: resolvedSecondInstallmentDueAt,
+    secondInstallmentExpired,
+    secondInstallmentUploadAllowed,
+    message: secondInstallmentExpired
+      ? getSecondInstallmentExpiredMessage()
+      : "Encontramos una inscripcion previa en 2 cuotas con segunda cuota pendiente.",
   };
+};
+
+const getPublicPricingCatalog = async (): Promise<PublicPricingCatalogResult> => {
+  const referenceDate = new Date();
+
+  return toPublicPricingCatalogDto({
+    discountPercentage: DEFAULT_DISCOUNT_PERCENTAGE,
+    installmentsAvailable: isInstallmentsAvailable(referenceDate),
+    installmentsAvailableUntil: INSTALLMENTS_AVAILABLE_UNTIL,
+    installmentsTimezone: INSTALLMENTS_TIMEZONE,
+    options: (
+      [
+        "ONE_DAY",
+        "THREE_DAYS",
+        "THREE_DAYS_WITH_LODGING",
+      ] as const
+    ).map((registrationOptionCode) => {
+      const registrationOption = getRegistrationOption(registrationOptionCode);
+
+      return {
+        code: registrationOption.code,
+        label: registrationOption.label,
+        baseTotalAmount: registrationOption.totalAmountExpected,
+        discountedTotalAmount: buildPricingSummary({
+          registrationOptionCode,
+          paymentPlanType: "ONE_PAYMENT",
+          discountPercentage: DEFAULT_DISCOUNT_PERCENTAGE,
+          referenceDate,
+        }).finalTotalAmount,
+        paymentPlans: getAllowedPaymentPlanTypes(
+          registrationOptionCode,
+          referenceDate,
+        ).map(
+          (paymentPlanType) => {
+            const basePricing = buildPricingSummary({
+              registrationOptionCode,
+              paymentPlanType,
+              referenceDate,
+            });
+            const discountedPricing = buildPricingSummary({
+              registrationOptionCode,
+              paymentPlanType,
+              discountPercentage: DEFAULT_DISCOUNT_PERCENTAGE,
+              referenceDate,
+            });
+
+            return {
+              type: paymentPlanType,
+              label: getPaymentPlanDefinition(paymentPlanType).label,
+              installmentCount: getInstallmentCountExpected(paymentPlanType),
+              baseInstallmentAmount: basePricing.installmentAmount,
+              discountedInstallmentAmount:
+                discountedPricing.installmentAmount,
+            };
+          },
+        ),
+      };
+    }),
+  });
+};
+
+const requestPublicDiscountCoupon = async ({
+  email,
+}: RequestDiscountCouponInput): Promise<RequestDiscountCouponResult> => {
+  const result = await requestDiscountCoupon({ email });
+  return toPublicDiscountCouponRequestResponseDto(result);
+};
+
+const validatePublicDiscountCoupon = async ({
+  email,
+  couponCode,
+}: ValidateDiscountCouponInput): Promise<ValidateDiscountCouponResult> => {
+  const result = await validateDiscountCoupon({
+    email,
+    couponCode,
+  });
+  return toPublicDiscountCouponValidationResponseDto(result);
 };
 
 export {
   createAdditionalReceipt,
   createInitialSubmission,
   findPendingSecondInstallment,
+  getPublicPricingCatalog,
   getPublicSubmissionStatus,
+  requestPublicDiscountCoupon,
   recoverTrackingCode,
+  validatePublicDiscountCoupon,
 };

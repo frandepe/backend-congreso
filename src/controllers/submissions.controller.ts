@@ -3,8 +3,11 @@ import {
   createAdditionalReceipt,
   createInitialSubmission,
   findPendingSecondInstallment,
+  getPublicPricingCatalog,
   getPublicSubmissionStatus,
+  requestPublicDiscountCoupon,
   recoverTrackingCode,
+  validatePublicDiscountCoupon,
 } from "../services/submission.service";
 import { sendSuccess } from "../utils/api-response";
 import { HttpError } from "../utils/http-error";
@@ -12,7 +15,9 @@ import type {
   CreateAdditionalReceiptInput,
   CreateInitialSubmissionInput,
   FindPendingSecondInstallmentInput,
+  RequestDiscountCouponInput,
   RecoverTrackingCodeInput,
+  ValidateDiscountCouponInput,
 } from "../types/submission.types";
 
 const createInitialSubmissionController = async (
@@ -58,11 +63,39 @@ const getPublicSubmissionStatusController = async (
   sendSuccess(res, result);
 };
 
+const getPublicPricingCatalogController = async (
+  _req: Request,
+  res: Response,
+): Promise<void> => {
+  const result = await getPublicPricingCatalog();
+  sendSuccess(res, result);
+};
+
 const recoverTrackingCodeController = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
   const result = await recoverTrackingCode(req.body as RecoverTrackingCodeInput);
+  sendSuccess(res, result);
+};
+
+const requestDiscountCouponController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const result = await requestPublicDiscountCoupon(
+    req.body as RequestDiscountCouponInput,
+  );
+  sendSuccess(res, result);
+};
+
+const validateDiscountCouponController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const result = await validatePublicDiscountCoupon(
+    req.body as ValidateDiscountCouponInput,
+  );
   sendSuccess(res, result);
 };
 
@@ -80,6 +113,9 @@ export {
   createAdditionalReceiptController,
   createInitialSubmissionController,
   findPendingSecondInstallmentController,
+  getPublicPricingCatalogController,
   getPublicSubmissionStatusController,
+  requestDiscountCouponController,
   recoverTrackingCodeController,
+  validateDiscountCouponController,
 };

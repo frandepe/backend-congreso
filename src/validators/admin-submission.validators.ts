@@ -15,6 +15,7 @@ const adminSubmissionListQuerySchema = z.object({
   status: z.nativeEnum(RegistrationStatus).optional(),
   registrationOptionCode: z.nativeEnum(RegistrationOptionCode).optional(),
   paymentPlanType: z.nativeEnum(PaymentPlanType).optional(),
+  hasDiscountCoupon: z.enum(["true"]).optional(),
 });
 
 const normalizeOptionalNote = (value: unknown): string | null | undefined => {

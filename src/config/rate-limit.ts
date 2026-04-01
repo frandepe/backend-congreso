@@ -22,11 +22,13 @@ const createRateLimiter = (max: number) =>
   });
 
 const loginRateLimiter = createRateLimiter(5);
+const discountCouponRateLimiter = createRateLimiter(5);
 const submissionCreateRateLimiter = createRateLimiter(10);
 const additionalReceiptRateLimiter = createRateLimiter(10);
 
 export {
   additionalReceiptRateLimiter,
+  discountCouponRateLimiter,
   loginRateLimiter,
   submissionCreateRateLimiter,
 };

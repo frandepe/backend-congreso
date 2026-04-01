@@ -7,6 +7,7 @@ import {
 import { HttpError } from "../utils/http-error";
 import type { AuthenticatedAdmin } from "../types/auth.types";
 import type { Prisma } from "@prisma/client";
+import { PaymentReceiptStatus } from "@prisma/client";
 import type {
   AdminSubmissionDetailDto,
   AdminSubmissionListItemDto,
@@ -19,6 +20,7 @@ type ListAdminSubmissionsInput = {
   status?: string;
   registrationOptionCode?: string;
   paymentPlanType?: string;
+  hasDiscountCoupon?: string;
 };
 
 type UpdateAdminSubmissionInput = {
@@ -28,10 +30,60 @@ type UpdateAdminSubmissionInput = {
   admin: AuthenticatedAdmin;
 };
 
+const getReceiptStatusForSubmissionStatus = ({
+  status,
+  installmentNumber,
+}: {
+  status?: string;
+  installmentNumber: number;
+}) => {
+  if (status === "FULLY_PAID") {
+    return PaymentReceiptStatus.APPROVED;
+  }
+
+  if (status === "PARTIALLY_PAID") {
+    return installmentNumber === 1
+      ? PaymentReceiptStatus.APPROVED
+      : PaymentReceiptStatus.PENDING_REVIEW;
+  }
+
+  if (status === "PENDING_REVIEW") {
+    return PaymentReceiptStatus.PENDING_REVIEW;
+  }
+
+  if (status === "REJECTED") {
+    return PaymentReceiptStatus.REJECTED;
+  }
+
+  return null;
+};
+
+const buildReceiptStatusSyncData = ({
+  receiptStatus,
+  adminId,
+  reviewedAt,
+}: {
+  receiptStatus: PaymentReceiptStatus;
+  adminId: string;
+  reviewedAt: Date;
+}): Prisma.PaymentReceiptSubmissionUpdateInput => {
+  return {
+    status: receiptStatus,
+    rejectionReason: null,
+    reviewedAt,
+    reviewedByAdmin: {
+      connect: {
+        id: adminId,
+      },
+    },
+  };
+};
+
 const buildSubmissionWhere = ({
   status,
   registrationOptionCode,
   paymentPlanType,
+  hasDiscountCoupon,
 }: Omit<
   ListAdminSubmissionsInput,
   "page" | "pageSize"
@@ -52,6 +104,13 @@ const buildSubmissionWhere = ({
             paymentPlanType as Prisma.RegistrationSubmissionWhereInput["paymentPlanType"],
         }
       : {}),
+    ...(hasDiscountCoupon === "true"
+      ? {
+          discountAppliedPercentage: {
+            not: null,
+          },
+        }
+      : {}),
   };
 };
 
@@ -61,11 +120,13 @@ const listAdminSubmissions = async ({
   status,
   registrationOptionCode,
   paymentPlanType,
+  hasDiscountCoupon,
 }: ListAdminSubmissionsInput) => {
   const where = buildSubmissionWhere({
     status,
     registrationOptionCode,
     paymentPlanType,
+    hasDiscountCoupon,
   });
 
   const skip = (page - 1) * pageSize;
@@ -133,6 +194,11 @@ const getAdminSubmissionDetail = async (submissionId: string) => {
       id: submissionId,
     },
     include: {
+      usedDiscountCoupon: {
+        select: {
+          code: true,
+        },
+      },
       reviewedByAdmin: {
         select: {
           id: true,
@@ -162,6 +228,24 @@ const getAdminSubmissionDetail = async (submissionId: string) => {
     );
   }
 
+  const submissionSecondInstallmentDueAt = (submission as any)
+    .secondInstallmentDueAt as Date | null | undefined;
+  const secondInstallmentDueAt =
+    submission.paymentPlanType === "TWO_INSTALLMENTS"
+      ? submissionSecondInstallmentDueAt ??
+        (() => {
+          const fallbackDueAt = new Date(submission.createdAt);
+          fallbackDueAt.setDate(fallbackDueAt.getDate() + 30);
+          return fallbackDueAt;
+        })()
+      : null;
+  const secondInstallmentExpired = Boolean(
+    secondInstallmentDueAt &&
+      submission.paymentPlanType === "TWO_INSTALLMENTS" &&
+      submission.paymentReceipts.length < submission.installmentCountExpected &&
+      new Date().getTime() > secondInstallmentDueAt.getTime(),
+  );
+
   return toAdminSubmissionDetailDto({
     id: submission.id,
     createdAt: submission.createdAt,
@@ -174,9 +258,31 @@ const getAdminSubmissionDetail = async (submissionId: string) => {
     registrationOptionCode: submission.registrationOptionCode,
     registrationOptionLabelSnapshot: submission.registrationOptionLabelSnapshot,
     currencyCode: submission.currencyCode,
+    baseAmountExpected:
+      submission.baseAmountExpected !== null
+        ? Number(submission.baseAmountExpected)
+        : null,
+    discountAppliedPercentage: submission.discountAppliedPercentage,
+    discountAppliedAmount:
+      submission.discountAppliedAmount !== null
+        ? Number(submission.discountAppliedAmount)
+        : null,
+    discountEligibleEmailNormalized:
+      submission.discountEligibleEmailNormalized,
+    discountCouponCode: submission.usedDiscountCoupon?.code ?? null,
     totalAmountExpected: Number(submission.totalAmountExpected),
+    installmentsAllowed: submission.installmentsAllowed,
     paymentPlanType: submission.paymentPlanType,
     installmentCountExpected: submission.installmentCountExpected,
+    installmentAmountExpected:
+      submission.installmentAmountExpected !== null
+        ? Number(submission.installmentAmountExpected)
+        : submission.installmentCountExpected > 0
+          ? Number(submission.totalAmountExpected) /
+            submission.installmentCountExpected
+        : null,
+    secondInstallmentDueAt,
+    secondInstallmentExpired,
     status: submission.status,
     notes: submission.notes,
     internalNote: submission.internalNote,
@@ -209,6 +315,15 @@ const updateAdminSubmission = async ({
     where: {
       id: submissionId,
     },
+    select: {
+      id: true,
+      paymentReceipts: {
+        select: {
+          id: true,
+          installmentNumber: true,
+        },
+      },
+    },
   });
 
   if (!existingSubmission) {
@@ -219,24 +334,54 @@ const updateAdminSubmission = async ({
     );
   }
 
-  const updatedSubmission = await prisma.registrationSubmission.update({
-    where: {
-      id: submissionId,
-    },
-    data: {
-      ...(status !== undefined ? { status: status as any } : {}),
-      ...(internalNote !== undefined ? { internalNote } : {}),
-      reviewedAt: new Date(),
-      reviewedByAdminId: admin.id,
-    },
-    include: {
-      reviewedByAdmin: {
-        select: {
-          id: true,
-          email: true,
+  const reviewedAt = new Date();
+
+  const updatedSubmission = await prisma.$transaction(async (tx) => {
+    if (status !== undefined && existingSubmission.paymentReceipts.length > 0) {
+      await Promise.all(
+        existingSubmission.paymentReceipts.map((receipt) => {
+          const receiptStatus = getReceiptStatusForSubmissionStatus({
+            status,
+            installmentNumber: receipt.installmentNumber,
+          });
+
+          if (!receiptStatus) {
+            return Promise.resolve(null);
+          }
+
+          return tx.paymentReceiptSubmission.update({
+            where: {
+              id: receipt.id,
+            },
+            data: buildReceiptStatusSyncData({
+              receiptStatus,
+              adminId: admin.id,
+              reviewedAt,
+            }),
+          });
+        }),
+      );
+    }
+
+    return tx.registrationSubmission.update({
+      where: {
+        id: submissionId,
+      },
+      data: {
+        ...(status !== undefined ? { status: status as any } : {}),
+        ...(internalNote !== undefined ? { internalNote } : {}),
+        reviewedAt,
+        reviewedByAdminId: admin.id,
+      },
+      include: {
+        reviewedByAdmin: {
+          select: {
+            id: true,
+            email: true,
+          },
         },
       },
-    },
+    });
   });
 
   return toAdminSubmissionUpdateDto({
