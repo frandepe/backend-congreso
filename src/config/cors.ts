@@ -18,7 +18,14 @@ const corsOptions: CorsOptions = {
       return;
     }
 
-    callback(new HttpError(403, "http://localhost:5173", "Origin not allowed"));
+    callback(
+      new HttpError(
+        403,
+        "https://www.congresonacionalrcp.com.ar",
+        "Origin not allowed",
+      ),
+    );
+    // callback(new HttpError(403, "http://localhost:5173", "Origin not allowed"));
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "OPTIONS"],
