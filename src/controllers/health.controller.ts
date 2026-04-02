@@ -5,4 +5,8 @@ const getHealth = (_req: Request, res: Response): void => {
   sendSuccess(res, { status: "ok" });
 };
 
-export { getHealth };
+const getPing = (_req: Request, res: Response): void => {
+  sendSuccess(res, { status: "ok" });
+};
+
+export { getHealth, getPing };
