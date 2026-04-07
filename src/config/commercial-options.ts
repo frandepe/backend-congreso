@@ -106,16 +106,24 @@ const getAllowedCommercialPaymentPlanTypes = (
   commercialKind: CommercialKind,
   referenceDate: Date = new Date(),
 ) => {
-  if (commercialKind === "ADVERTISING") {
-    return ["ONE_PAYMENT"] satisfies PaymentPlanType[];
-  }
-
   if (isCommercialInstallmentsAvailable(referenceDate)) {
     return ["ONE_PAYMENT", "TWO_INSTALLMENTS"] satisfies PaymentPlanType[];
   }
 
   return ["ONE_PAYMENT"] satisfies PaymentPlanType[];
 };
+
+const getCommercialPaymentPlansCatalog = (
+  commercialKind: CommercialKind,
+  referenceDate: Date = new Date(),
+) =>
+  getAllowedCommercialPaymentPlanTypes(commercialKind, referenceDate).map(
+    (paymentPlanType) => ({
+      type: paymentPlanType,
+      label: paymentPlanType === "TWO_INSTALLMENTS" ? "2 cuotas" : "1 pago",
+      installmentCount: getCommercialInstallmentCountExpected(paymentPlanType),
+    }),
+  );
 
 const assertCommercialPaymentPlanAllowed = (
   commercialKind: CommercialKind,
@@ -181,16 +189,25 @@ const buildCommercialPricingSummary = ({
   );
 
   if (commercialKind === "ADVERTISING") {
+    const totalAmount = option.totalAmount;
+
     return {
       option,
       baseAmount: option.totalAmount,
       equipmentAdditionalAmount: 0,
       discountAppliedAmount: 0,
-      totalAmount: option.totalAmount,
+      totalAmount,
       paymentPlanType,
-      installmentCountExpected: 1,
-      installmentAmount: option.totalAmount,
-      secondInstallmentDueAt: null,
+      installmentCountExpected:
+        getCommercialInstallmentCountExpected(paymentPlanType),
+      installmentAmount: getCommercialInstallmentAmount(
+        totalAmount,
+        paymentPlanType,
+      ),
+      secondInstallmentDueAt: getCommercialSecondInstallmentDueAt(
+        referenceDate,
+        paymentPlanType,
+      ),
       includesEquipment: false,
     };
   }
@@ -230,12 +247,13 @@ const getCommercialPricingCatalog = () => {
   const advertisingOptions = Object.values(COMMERCIAL_OPTIONS).filter(
     (option) => option.kind === "ADVERTISING",
   );
+  const referenceDate = new Date();
 
   return {
     standDiscountAmount: COMMERCIAL_STAND_DISCOUNT_AMOUNT,
     standEquipmentAdditionalAmount:
       COMMERCIAL_STAND_EQUIPMENT_ADDITIONAL_AMOUNT,
-    installmentsAvailable: isCommercialInstallmentsAvailable(),
+    installmentsAvailable: isCommercialInstallmentsAvailable(referenceDate),
     installmentsAvailableUntil: COMMERCIAL_INSTALLMENTS_AVAILABLE_UNTIL,
     installmentsTimezone: COMMERCIAL_INSTALLMENTS_TIMEZONE,
     standOptions: [
@@ -246,28 +264,20 @@ const getCommercialPricingCatalog = () => {
         discountedAmount:
           standOption.totalAmount - COMMERCIAL_STAND_DISCOUNT_AMOUNT,
         equipmentAdditionalAmount: COMMERCIAL_STAND_EQUIPMENT_ADDITIONAL_AMOUNT,
-        paymentPlans: [
-          {
-            type: "ONE_PAYMENT" as const,
-            label: "1 pago",
-            installmentCount: 1,
-          },
-          ...(isCommercialInstallmentsAvailable()
-            ? [
-                {
-                  type: "TWO_INSTALLMENTS" as const,
-                  label: "2 cuotas",
-                  installmentCount: 2,
-                },
-              ]
-            : []),
-        ],
+        paymentPlans: getCommercialPaymentPlansCatalog(
+          standOption.kind,
+          referenceDate,
+        ),
       },
     ],
     advertisingOptions: advertisingOptions.map((option) => ({
       code: option.code,
       label: option.label,
       totalAmount: option.totalAmount,
+      paymentPlans: getCommercialPaymentPlansCatalog(
+        option.kind,
+        referenceDate,
+      ),
     })),
   };
 };

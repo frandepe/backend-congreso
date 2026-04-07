@@ -97,14 +97,14 @@ const getFrontendExhibitorsUrl = () => {
   return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/expositores`;
 };
 
-const getFrontendExhibitorsSecondInstallmentUrl = () => {
+const getFrontendCommercialSecondInstallmentUrl = () => {
   const frontendBaseUrl = env.corsAllowedOrigins[0];
 
   if (!frontendBaseUrl) {
-    return "/inscripcion/expositores/segunda-cuota";
+    return "/inscripcion/comercial/segunda-cuota";
   }
 
-  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/expositores/segunda-cuota`;
+  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/comercial/segunda-cuota`;
 };
 
 const getTransporter = () => {
@@ -345,10 +345,10 @@ const buildCommercialSubmissionConfirmationEmailHtml = ({
         ${
           paymentPlanLabel === "2 cuotas"
             ? buildActionBlock({
-                label: "Ir a segunda cuota de expositores",
-                href: getFrontendExhibitorsSecondInstallmentUrl(),
+                label: "Ir a segunda cuota comercial",
+                href: getFrontendCommercialSecondInstallmentUrl(),
                 helper:
-                  "Cuando completes la transferencia restante, usa este acceso para informar la cuota 2 del stand.",
+                  "Cuando completes la transferencia restante, usa este acceso para informar la cuota 2 de la solicitud comercial.",
               })
             : ""
         }
@@ -403,7 +403,7 @@ const sendCommercialTrackingCodeRecoveryEmail = async ({
   to,
   trackingCodes,
 }: CommercialTrackingCodeRecoveryEmailInput) => {
-  const secondInstallmentUrl = getFrontendExhibitorsSecondInstallmentUrl();
+  const secondInstallmentUrl = getFrontendCommercialSecondInstallmentUrl();
   const codesHtml = trackingCodes
     .map(
       (trackingCode) => `
@@ -436,10 +436,10 @@ const sendCommercialTrackingCodeRecoveryEmail = async ({
           ${codesHtml}
         </table>
         ${buildActionBlock({
-          label: "Abrir segunda cuota de expositores",
+          label: "Abrir segunda cuota comercial",
           href: secondInstallmentUrl,
           helper:
-            "Puedes usar cualquiera de estos codigos en la pantalla publica de segunda cuota para stands.",
+            "Puedes usar cualquiera de estos codigos en la pantalla publica de segunda cuota comercial.",
         })}
       `,
       footer:

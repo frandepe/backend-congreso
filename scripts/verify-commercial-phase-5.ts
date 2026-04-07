@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildCommercialPricingSummary,
+  getAllowedCommercialPaymentPlanTypes,
   getCommercialPricingCatalog,
 } from "../src/config/commercial-options";
 import {
@@ -16,6 +17,13 @@ function assertIncludes(haystack: string, needle: string, label: string) {
   );
 }
 
+function assertDoesNotInclude(haystack: string, needle: string, label: string) {
+  assert.ok(
+    !haystack.includes(needle),
+    `Expected ${label} not to include "${needle}"`,
+  );
+}
+
 function runPricingAssertions() {
   const catalog = getCommercialPricingCatalog();
 
@@ -23,6 +31,10 @@ function runPricingAssertions() {
   assert.equal(catalog.standEquipmentAdditionalAmount, 150000);
   assert.equal(catalog.standOptions[0]?.baseAmount, 300000);
   assert.equal(catalog.standOptions[0]?.discountedAmount, 200000);
+  assert.deepEqual(
+    catalog.standOptions[0]?.paymentPlans.map((plan) => plan.type),
+    ["ONE_PAYMENT", "TWO_INSTALLMENTS"],
+  );
 
   assert.equal(
     buildCommercialPricingSummary({
@@ -76,7 +88,7 @@ function runPricingAssertions() {
   ] as const;
 
   for (const [commercialOptionCode, expectedTotal] of advertisingExpectations) {
-    const result = buildCommercialPricingSummary({
+    const onePaymentResult = buildCommercialPricingSummary({
       commercialKind: "ADVERTISING",
       commercialOptionCode,
       paymentPlanType: "ONE_PAYMENT",
@@ -84,10 +96,53 @@ function runPricingAssertions() {
       applyStandDiscount: true,
     });
 
-    assert.equal(result.totalAmount, expectedTotal);
-    assert.equal(result.discountAppliedAmount, 0);
-    assert.equal(result.equipmentAdditionalAmount, 0);
+    assert.equal(onePaymentResult.totalAmount, expectedTotal);
+    assert.equal(onePaymentResult.installmentCountExpected, 1);
+    assert.equal(onePaymentResult.installmentAmount, expectedTotal);
+    assert.equal(onePaymentResult.secondInstallmentDueAt, null);
+    assert.equal(onePaymentResult.discountAppliedAmount, 0);
+    assert.equal(onePaymentResult.equipmentAdditionalAmount, 0);
+
+    const twoInstallmentsResult = buildCommercialPricingSummary({
+      commercialKind: "ADVERTISING",
+      commercialOptionCode,
+      paymentPlanType: "TWO_INSTALLMENTS",
+      includesEquipment: true,
+      applyStandDiscount: true,
+      referenceDate: new Date("2026-04-01T12:00:00.000-03:00"),
+    });
+
+    assert.equal(twoInstallmentsResult.totalAmount, expectedTotal);
+    assert.equal(twoInstallmentsResult.installmentCountExpected, 2);
+    assert.equal(twoInstallmentsResult.installmentAmount, expectedTotal / 2);
+    assert.ok(twoInstallmentsResult.secondInstallmentDueAt instanceof Date);
+    assert.equal(twoInstallmentsResult.discountAppliedAmount, 0);
+    assert.equal(twoInstallmentsResult.equipmentAdditionalAmount, 0);
   }
+
+  for (const option of catalog.advertisingOptions) {
+    assert.deepEqual(
+      option.paymentPlans.map((plan) => plan.type),
+      ["ONE_PAYMENT", "TWO_INSTALLMENTS"],
+    );
+  }
+
+  assert.deepEqual(
+    getAllowedCommercialPaymentPlanTypes(
+      "ADVERTISING",
+      new Date("2026-09-01T00:00:00.000-03:00"),
+    ),
+    ["ONE_PAYMENT"],
+  );
+
+  assert.throws(() =>
+    buildCommercialPricingSummary({
+      commercialKind: "ADVERTISING",
+      commercialOptionCode: "ADVERTISING_WEB_PAGE",
+      paymentPlanType: "TWO_INSTALLMENTS",
+      referenceDate: new Date("2026-09-01T00:00:00.000-03:00"),
+    }),
+  );
 
   assert.throws(() =>
     buildCommercialPricingSummary({
@@ -131,6 +186,60 @@ function runEmailAssertions() {
     submissionHtml,
     "Adicional equipamiento",
     "commercial confirmation email",
+  );
+  assertIncludes(
+    submissionHtml,
+    "/inscripcion/comercial/segunda-cuota",
+    "commercial confirmation email",
+  );
+  assertIncludes(
+    submissionHtml,
+    "Ir a segunda cuota comercial",
+    "commercial confirmation email",
+  );
+  assertDoesNotInclude(
+    submissionHtml,
+    "/inscripcion/expositores/segunda-cuota",
+    "commercial confirmation email",
+  );
+
+  const advertisingSubmissionHtml = buildCommercialSubmissionConfirmationEmailHtml({
+    trackingCode: "COM-000456",
+    commercialKindLabel: "Publicidad",
+    commercialOptionLabel: "Publicidad en pagina del congreso",
+    companyName: "Empresa Publicidad",
+    paymentPlanLabel: "2 cuotas",
+    totalAmountExpected: 100000,
+    installmentAmountExpected: 50000,
+    discountAppliedAmount: null,
+    equipmentAdditionalAmount: null,
+    secondInstallmentDueAt: new Date("2026-05-01T12:00:00.000Z"),
+  });
+
+  assertIncludes(
+    advertisingSubmissionHtml,
+    "Publicidad",
+    "advertising confirmation email",
+  );
+  assertIncludes(
+    advertisingSubmissionHtml,
+    "Ir a segunda cuota comercial",
+    "advertising confirmation email",
+  );
+  assertIncludes(
+    advertisingSubmissionHtml,
+    "/inscripcion/comercial/segunda-cuota",
+    "advertising confirmation email",
+  );
+  assertDoesNotInclude(
+    advertisingSubmissionHtml,
+    "Adicional equipamiento",
+    "advertising confirmation email",
+  );
+  assertDoesNotInclude(
+    advertisingSubmissionHtml,
+    "Descuento aplicado",
+    "advertising confirmation email",
   );
 
   const couponHtml = buildCommercialStandDiscountCouponEmailHtml({
@@ -203,6 +312,70 @@ function runWorkbookAssertions() {
           },
         ],
       },
+      {
+        id: "commercial-submission-2",
+        createdAt: "2026-04-02T12:00:00.000Z",
+        updatedAt: "2026-04-02T13:00:00.000Z",
+        reviewedAt: "2026-04-02T14:00:00.000Z",
+        status: "PENDING_REVIEW",
+        commercialKind: "ADVERTISING",
+        commercialOptionCode: "ADVERTISING_WEB_PAGE",
+        companyName: "Empresa Publicidad",
+        contactFirstName: "Luis",
+        contactLastName: "Gomez",
+        email: "publicidad@empresa.com",
+        phone: "654321",
+        websiteOrSocialUrl: "https://empresa.example",
+        currencyCode: "ARS",
+        baseAmountExpected: 100000,
+        equipmentAdditionalAmount: null,
+        includesEquipment: false,
+        discountAppliedAmount: null,
+        discountCouponCode: null,
+        discountEligibleEmailNormalized: null,
+        totalAmountExpected: 100000,
+        paymentPlanType: "TWO_INSTALLMENTS",
+        installmentCountExpected: 2,
+        installmentAmountExpected: 50000,
+        secondInstallmentDueAt: "2026-05-02T12:00:00.000Z",
+        secondInstallmentExpired: false,
+        notes: "Publicidad",
+        internalNote: "Revisar publicidad",
+        reviewedByAdmin: {
+          id: "admin-1",
+          email: "admin@congreso.com",
+        },
+        receipts: [
+          {
+            id: "receipt-2",
+            installmentNumber: 1,
+            amountReported: 50000,
+            paymentDate: "2026-04-02T00:00:00.000Z",
+            status: "APPROVED",
+            rejectionReason: null,
+            reviewedAt: "2026-04-02T14:00:00.000Z",
+            reviewedByAdminEmail: "admin@congreso.com",
+            receiptUrl: "https://example.com/advertising-receipt-1.pdf",
+            receiptOriginalFilename: "advertising-receipt-1.pdf",
+            receiptMimeType: "application/pdf",
+            receiptSizeBytes: 123456,
+          },
+          {
+            id: "receipt-3",
+            installmentNumber: 2,
+            amountReported: 50000,
+            paymentDate: "2026-04-20T00:00:00.000Z",
+            status: "PENDING_REVIEW",
+            rejectionReason: null,
+            reviewedAt: null,
+            reviewedByAdminEmail: undefined,
+            receiptUrl: "https://example.com/advertising-receipt-2.pdf",
+            receiptOriginalFilename: "advertising-receipt-2.pdf",
+            receiptMimeType: "application/pdf",
+            receiptSizeBytes: 234567,
+          },
+        ],
+      },
     ] as any,
     "2026-04-01 15:00:00",
   );
@@ -213,6 +386,10 @@ function runWorkbookAssertions() {
   assertIncludes(workbookXml, "STAND-ABC123", "workbook xml");
   assertIncludes(workbookXml, "URL comprobante", "workbook xml");
   assertIncludes(workbookXml, "https://example.com/receipt.pdf", "workbook xml");
+  assertIncludes(workbookXml, "Publicidad", "workbook xml");
+  assertIncludes(workbookXml, "ADVERTISING_WEB_PAGE", "workbook xml");
+  assertIncludes(workbookXml, "https://example.com/advertising-receipt-2.pdf", "workbook xml");
+  assertIncludes(workbookXml, ">2</Data>", "workbook xml");
 }
 
 runPricingAssertions();

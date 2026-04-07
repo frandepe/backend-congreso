@@ -232,6 +232,11 @@ export type CommercialAdvertisingPricingOptionDto = {
   code: CommercialOptionCode;
   label: string;
   totalAmount: number;
+  paymentPlans: Array<{
+    type: PaymentPlanType;
+    label: string;
+    installmentCount: number;
+  }>;
 };
 
 export type CommercialPricingCatalogDto = {

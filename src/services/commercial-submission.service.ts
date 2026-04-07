@@ -54,7 +54,7 @@ const getElapsedMs = (startedAt: number) =>
   Number((nowMs() - startedAt).toFixed(1));
 
 const getCommercialSecondInstallmentExpiredMessage = () =>
-  "Se vencio el plazo para informar la segunda cuota del stand. Comunicate con el comite organizador.";
+  "Se vencio el plazo para informar la segunda cuota de la solicitud comercial. Comunicate con el comite organizador.";
 
 const resolveCommercialSecondInstallmentDueAt = (input: {
   createdAt: Date;
@@ -399,14 +399,6 @@ const createCommercialAdditionalReceipt = async (
     );
   }
 
-  if (existingSubmission.commercialKind !== "STAND") {
-    throw new HttpError(
-      400,
-      "COMMERCIAL_SECOND_INSTALLMENT_NOT_ALLOWED",
-      "Solo los stands admiten segunda cuota",
-    );
-  }
-
   if (existingSubmission.paymentPlanType !== "TWO_INSTALLMENTS") {
     throw new HttpError(
       400,
@@ -568,7 +560,6 @@ const getCommercialSubmissionStatus = async (
     (receipt) => receipt.status === PaymentReceiptStatus.PENDING_REVIEW,
   ).length;
   const secondInstallmentUploadAllowed =
-    submission.commercialKind === "STAND" &&
     submission.paymentPlanType === "TWO_INSTALLMENTS" &&
     submission.paymentReceipts.length < submission.installmentCountExpected &&
     !secondInstallmentExpired;
