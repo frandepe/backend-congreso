@@ -6,7 +6,6 @@ const RECEIPT_FIELD_NAME = "receipt";
 const ALLOWED_RECEIPT_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
-  "application/pdf",
 ]);
 
 const upload = multer({
