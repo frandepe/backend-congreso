@@ -16,7 +16,6 @@ const adminCommercialSubmissionListQuerySchema = z.object({
   commercialKind: z.nativeEnum(CommercialKind).optional(),
   commercialOptionCode: z.nativeEnum(CommercialOptionCode).optional(),
   hasDiscountCoupon: z.enum(["true"]).optional(),
-  includesEquipment: z.enum(["true", "false"]).optional(),
 });
 
 const normalizeOptionalNote = (value: unknown): string | null | undefined => {

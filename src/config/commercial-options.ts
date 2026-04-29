@@ -16,13 +16,11 @@ type CommercialPricingSummaryInput = {
   commercialKind: CommercialKind;
   commercialOptionCode: CommercialOptionCode;
   paymentPlanType: PaymentPlanType;
-  includesEquipment?: boolean;
   applyStandDiscount?: boolean;
   referenceDate?: Date;
 };
 
 const COMMERCIAL_STAND_DISCOUNT_AMOUNT = 100000;
-const COMMERCIAL_STAND_EQUIPMENT_ADDITIONAL_AMOUNT = 150000;
 const COMMERCIAL_INSTALLMENTS_AVAILABLE_UNTIL = new Date(
   "2026-08-31T23:59:59.999-03:00",
 );
@@ -175,7 +173,6 @@ const buildCommercialPricingSummary = ({
   commercialKind,
   commercialOptionCode,
   paymentPlanType,
-  includesEquipment = false,
   applyStandDiscount = false,
   referenceDate = new Date(),
 }: CommercialPricingSummaryInput) => {
@@ -194,7 +191,6 @@ const buildCommercialPricingSummary = ({
     return {
       option,
       baseAmount: option.totalAmount,
-      equipmentAdditionalAmount: 0,
       discountAppliedAmount: 0,
       totalAmount,
       paymentPlanType,
@@ -208,23 +204,17 @@ const buildCommercialPricingSummary = ({
         referenceDate,
         paymentPlanType,
       ),
-      includesEquipment: false,
     };
   }
 
-  const equipmentAdditionalAmount = includesEquipment
-    ? COMMERCIAL_STAND_EQUIPMENT_ADDITIONAL_AMOUNT
-    : 0;
   const discountAppliedAmount = applyStandDiscount
     ? COMMERCIAL_STAND_DISCOUNT_AMOUNT
     : 0;
-  const totalAmount =
-    option.totalAmount - discountAppliedAmount + equipmentAdditionalAmount;
+  const totalAmount = option.totalAmount - discountAppliedAmount;
 
   return {
     option,
     baseAmount: option.totalAmount,
-    equipmentAdditionalAmount,
     discountAppliedAmount,
     totalAmount,
     paymentPlanType,
@@ -238,7 +228,6 @@ const buildCommercialPricingSummary = ({
       referenceDate,
       paymentPlanType,
     ),
-    includesEquipment,
   };
 };
 
@@ -251,8 +240,6 @@ const getCommercialPricingCatalog = () => {
 
   return {
     standDiscountAmount: COMMERCIAL_STAND_DISCOUNT_AMOUNT,
-    standEquipmentAdditionalAmount:
-      COMMERCIAL_STAND_EQUIPMENT_ADDITIONAL_AMOUNT,
     installmentsAvailable: isCommercialInstallmentsAvailable(referenceDate),
     installmentsAvailableUntil: COMMERCIAL_INSTALLMENTS_AVAILABLE_UNTIL,
     installmentsTimezone: COMMERCIAL_INSTALLMENTS_TIMEZONE,
@@ -263,7 +250,6 @@ const getCommercialPricingCatalog = () => {
         baseAmount: standOption.totalAmount,
         discountedAmount:
           standOption.totalAmount - COMMERCIAL_STAND_DISCOUNT_AMOUNT,
-        equipmentAdditionalAmount: COMMERCIAL_STAND_EQUIPMENT_ADDITIONAL_AMOUNT,
         paymentPlans: getCommercialPaymentPlansCatalog(
           standOption.kind,
           referenceDate,
@@ -290,7 +276,6 @@ export {
   COMMERCIAL_INSTALLMENTS_TIMEZONE,
   COMMERCIAL_SECOND_INSTALLMENT_DUE_DAYS,
   COMMERCIAL_STAND_DISCOUNT_AMOUNT,
-  COMMERCIAL_STAND_EQUIPMENT_ADDITIONAL_AMOUNT,
   getAllowedCommercialPaymentPlanTypes,
   getCommercialInstallmentAmount,
   getCommercialInstallmentCountExpected,

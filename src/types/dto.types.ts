@@ -220,7 +220,6 @@ export type CommercialStandPricingOptionDto = {
   label: string;
   baseAmount: number;
   discountedAmount: number;
-  equipmentAdditionalAmount: number;
   paymentPlans: Array<{
     type: PaymentPlanType;
     label: string;
@@ -241,7 +240,6 @@ export type CommercialAdvertisingPricingOptionDto = {
 
 export type CommercialPricingCatalogDto = {
   standDiscountAmount: number;
-  standEquipmentAdditionalAmount: number;
   installmentsAvailable: boolean;
   installmentsAvailableUntil: Date;
   installmentsTimezone: string;
@@ -272,9 +270,7 @@ export type CommercialSubmissionCreatedDto = {
     label: string;
     companyName: string;
     baseAmountExpected: number;
-    equipmentAdditionalAmount: number | null;
     discountAppliedAmount: number | null;
-    includesEquipment: boolean;
     totalAmountExpected: number;
   };
   paymentPlanType: PaymentPlanType;
@@ -355,7 +351,6 @@ export type AdminCommercialSubmissionListItemDto = {
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
   submittedReceiptsCount: number;
-  includesEquipment: boolean;
   hasDiscountCoupon: boolean;
   receiptStatus: PaymentReceiptStatus | null;
   status: RegistrationStatus;

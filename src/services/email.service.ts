@@ -34,7 +34,6 @@ type CommercialSubmissionConfirmationEmailInput = {
   totalAmountExpected: number;
   installmentAmountExpected: number | null;
   discountAppliedAmount: number | null;
-  equipmentAdditionalAmount: number | null;
   secondInstallmentDueAt: Date | null;
 };
 
@@ -105,6 +104,16 @@ const getFrontendCommercialSecondInstallmentUrl = () => {
   }
 
   return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/comercial/segunda-cuota`;
+};
+
+const getFrontendCatalogosLivingsUrl = () => {
+  const frontendBaseUrl = env.corsAllowedOrigins[0];
+
+  if (!frontendBaseUrl) {
+    return "/catalogos-livings";
+  }
+
+  return `${frontendBaseUrl.replace(/\/+$/, "")}/catalogos-livings`;
 };
 
 const getTransporter = () => {
@@ -269,9 +278,10 @@ const buildCommercialSubmissionConfirmationEmailHtml = ({
   totalAmountExpected,
   installmentAmountExpected,
   discountAppliedAmount,
-  equipmentAdditionalAmount,
   secondInstallmentDueAt,
 }: Omit<CommercialSubmissionConfirmationEmailInput, "to">) => {
+  const catalogosLivingsUrl = getFrontendCatalogosLivingsUrl();
+
   return buildEmailLayout({
     eyebrow: "Solicitud comercial recibida",
     title: "Recibimos tu comprobante",
@@ -321,14 +331,6 @@ const buildCommercialSubmissionConfirmationEmailHtml = ({
               },
             ]
           : []),
-        ...(equipmentAdditionalAmount
-          ? [
-              {
-                label: "Adicional equipamiento",
-                value: formatArsCurrency(equipmentAdditionalAmount),
-              },
-            ]
-          : []),
         ...(secondInstallmentDueAt
           ? [
               {
@@ -342,6 +344,16 @@ const buildCommercialSubmissionConfirmationEmailHtml = ({
         ${buildParagraph(
           "Guarda este codigo de seguimiento. Te servira para cualquier consulta manual que el comite necesite resolver sobre esta contratacion.",
         )}
+        ${
+          commercialKindLabel === "Stand"
+            ? buildActionBlock({
+                label: "Ver opciones de livings y equipamiento",
+                href: catalogosLivingsUrl,
+                helper:
+                  "El equipamiento adicional del stand se gestiona por separado y no esta incluido en el valor del espacio.",
+              })
+            : ""
+        }
         ${
           paymentPlanLabel === "2 cuotas"
             ? buildActionBlock({
@@ -646,7 +658,6 @@ const sendCommercialSubmissionConfirmationEmail = async ({
   totalAmountExpected,
   installmentAmountExpected,
   discountAppliedAmount,
-  equipmentAdditionalAmount,
   secondInstallmentDueAt,
 }: CommercialSubmissionConfirmationEmailInput) => {
   await getTransporter().sendMail({
@@ -662,7 +673,6 @@ const sendCommercialSubmissionConfirmationEmail = async ({
       totalAmountExpected,
       installmentAmountExpected,
       discountAppliedAmount,
-      equipmentAdditionalAmount,
       secondInstallmentDueAt,
     }),
   });

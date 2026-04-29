@@ -28,7 +28,6 @@ function runPricingAssertions() {
   const catalog = getCommercialPricingCatalog();
 
   assert.equal(catalog.standDiscountAmount, 100000);
-  assert.equal(catalog.standEquipmentAdditionalAmount, 150000);
   assert.equal(catalog.standOptions[0]?.baseAmount, 300000);
   assert.equal(catalog.standOptions[0]?.discountedAmount, 200000);
   assert.deepEqual(
@@ -41,7 +40,6 @@ function runPricingAssertions() {
       commercialKind: "STAND",
       commercialOptionCode: "STAND_SPACE_3X3",
       paymentPlanType: "ONE_PAYMENT",
-      includesEquipment: false,
       applyStandDiscount: false,
     }).totalAmount,
     300000,
@@ -52,32 +50,9 @@ function runPricingAssertions() {
       commercialKind: "STAND",
       commercialOptionCode: "STAND_SPACE_3X3",
       paymentPlanType: "ONE_PAYMENT",
-      includesEquipment: true,
-      applyStandDiscount: false,
-    }).totalAmount,
-    450000,
-  );
-
-  assert.equal(
-    buildCommercialPricingSummary({
-      commercialKind: "STAND",
-      commercialOptionCode: "STAND_SPACE_3X3",
-      paymentPlanType: "ONE_PAYMENT",
-      includesEquipment: false,
       applyStandDiscount: true,
     }).totalAmount,
     200000,
-  );
-
-  assert.equal(
-    buildCommercialPricingSummary({
-      commercialKind: "STAND",
-      commercialOptionCode: "STAND_SPACE_3X3",
-      paymentPlanType: "ONE_PAYMENT",
-      includesEquipment: true,
-      applyStandDiscount: true,
-    }).totalAmount,
-    350000,
   );
 
   const advertisingExpectations = [
@@ -92,7 +67,6 @@ function runPricingAssertions() {
       commercialKind: "ADVERTISING",
       commercialOptionCode,
       paymentPlanType: "ONE_PAYMENT",
-      includesEquipment: true,
       applyStandDiscount: true,
     });
 
@@ -101,13 +75,11 @@ function runPricingAssertions() {
     assert.equal(onePaymentResult.installmentAmount, expectedTotal);
     assert.equal(onePaymentResult.secondInstallmentDueAt, null);
     assert.equal(onePaymentResult.discountAppliedAmount, 0);
-    assert.equal(onePaymentResult.equipmentAdditionalAmount, 0);
 
     const twoInstallmentsResult = buildCommercialPricingSummary({
       commercialKind: "ADVERTISING",
       commercialOptionCode,
       paymentPlanType: "TWO_INSTALLMENTS",
-      includesEquipment: true,
       applyStandDiscount: true,
       referenceDate: new Date("2026-04-01T12:00:00.000-03:00"),
     });
@@ -117,7 +89,6 @@ function runPricingAssertions() {
     assert.equal(twoInstallmentsResult.installmentAmount, expectedTotal / 2);
     assert.ok(twoInstallmentsResult.secondInstallmentDueAt instanceof Date);
     assert.equal(twoInstallmentsResult.discountAppliedAmount, 0);
-    assert.equal(twoInstallmentsResult.equipmentAdditionalAmount, 0);
   }
 
   for (const option of catalog.advertisingOptions) {
@@ -160,10 +131,9 @@ function runEmailAssertions() {
     commercialOptionLabel: "Stand 3x3",
     companyName: "Empresa Demo",
     paymentPlanLabel: "2 cuotas",
-    totalAmountExpected: 350000,
-    installmentAmountExpected: 175000,
+    totalAmountExpected: 200000,
+    installmentAmountExpected: 100000,
     discountAppliedAmount: 100000,
-    equipmentAdditionalAmount: 150000,
     secondInstallmentDueAt: new Date("2026-05-01T12:00:00.000Z"),
   });
 
@@ -184,12 +154,17 @@ function runEmailAssertions() {
   );
   assertIncludes(
     submissionHtml,
-    "Adicional equipamiento",
+    "/inscripcion/comercial/segunda-cuota",
     "commercial confirmation email",
   );
   assertIncludes(
     submissionHtml,
-    "/inscripcion/comercial/segunda-cuota",
+    "/catalogos-livings",
+    "commercial confirmation email",
+  );
+  assertIncludes(
+    submissionHtml,
+    "Ver opciones de livings y equipamiento",
     "commercial confirmation email",
   );
   assertIncludes(
@@ -212,7 +187,6 @@ function runEmailAssertions() {
     totalAmountExpected: 100000,
     installmentAmountExpected: 50000,
     discountAppliedAmount: null,
-    equipmentAdditionalAmount: null,
     secondInstallmentDueAt: new Date("2026-05-01T12:00:00.000Z"),
   });
 
@@ -233,7 +207,7 @@ function runEmailAssertions() {
   );
   assertDoesNotInclude(
     advertisingSubmissionHtml,
-    "Adicional equipamiento",
+    "/catalogos-livings",
     "advertising confirmation email",
   );
   assertDoesNotInclude(
@@ -278,15 +252,15 @@ function runWorkbookAssertions() {
         phone: "123456",
         currencyCode: "ARS",
         baseAmountExpected: 300000,
-        equipmentAdditionalAmount: 150000,
-        includesEquipment: true,
+        equipmentAdditionalAmount: null,
+        includesEquipment: false,
         discountAppliedAmount: 100000,
         discountCouponCode: "STAND-ABC123",
         discountEligibleEmailNormalized: "frandepaulo@yahoo.com.ar",
-        totalAmountExpected: 350000,
+        totalAmountExpected: 200000,
         paymentPlanType: "TWO_INSTALLMENTS",
         installmentCountExpected: 2,
-        installmentAmountExpected: 175000,
+        installmentAmountExpected: 100000,
         secondInstallmentDueAt: "2026-05-01T12:00:00.000Z",
         secondInstallmentExpired: false,
         notes: "Notas",

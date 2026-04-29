@@ -26,7 +26,6 @@ export type CreateCommercialSubmissionInput = {
   commercialOptionCode: CommercialOptionCode;
   paymentPlanType: PaymentPlanType;
   installmentNumber: number;
-  includesEquipment?: boolean;
   amountReported: number;
   discountCouponCode?: string;
   paymentDate?: Date;
@@ -43,9 +42,7 @@ export type CreateCommercialSubmissionResult = {
     label: string;
     companyName: string;
     baseAmountExpected: number;
-    equipmentAdditionalAmount: number | null;
     discountAppliedAmount: number | null;
-    includesEquipment: boolean;
     totalAmountExpected: number;
   };
   paymentPlanType: PaymentPlanType;

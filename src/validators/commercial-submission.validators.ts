@@ -46,16 +46,6 @@ const commercialSubmissionBodySchema = z.object({
   commercialOptionCode: z.nativeEnum(CommercialOptionCode),
   paymentPlanType: z.nativeEnum(PaymentPlanType),
   installmentNumber: z.coerce.number().int().positive(),
-  includesEquipment: z
-    .union([z.boolean(), z.string()])
-    .optional()
-    .transform((value) => {
-      if (typeof value === "boolean") {
-        return value;
-      }
-
-      return value === "true";
-    }),
   amountReported: z.coerce.number().positive(),
   discountCouponCode: z
     .string()

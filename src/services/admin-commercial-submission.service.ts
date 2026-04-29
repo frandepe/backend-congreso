@@ -11,7 +11,6 @@ type ListAdminCommercialSubmissionsInput = {
   commercialKind?: string;
   commercialOptionCode?: string;
   hasDiscountCoupon?: string;
-  includesEquipment?: string;
 };
 
 type UpdateAdminCommercialSubmissionInput = {
@@ -42,7 +41,6 @@ const buildWhere = ({
   commercialKind,
   commercialOptionCode,
   hasDiscountCoupon,
-  includesEquipment,
 }: Omit<ListAdminCommercialSubmissionsInput, "page" | "pageSize">): Prisma.CommercialSubmissionWhereInput => {
   return {
     ...(status ? { status: status as any } : {}),
@@ -57,11 +55,6 @@ const buildWhere = ({
           },
         }
       : {}),
-    ...(includesEquipment === "true"
-      ? { includesEquipment: true }
-      : includesEquipment === "false"
-        ? { includesEquipment: false }
-        : {}),
   };
 };
 
@@ -72,14 +65,12 @@ const listAdminCommercialSubmissions = async ({
   commercialKind,
   commercialOptionCode,
   hasDiscountCoupon,
-  includesEquipment,
 }: ListAdminCommercialSubmissionsInput) => {
   const where = buildWhere({
     status,
     commercialKind,
     commercialOptionCode,
     hasDiscountCoupon,
-    includesEquipment,
   });
 
   const skip = (page - 1) * pageSize;
@@ -127,7 +118,6 @@ const listAdminCommercialSubmissions = async ({
       paymentPlanType: item.paymentPlanType,
       installmentCountExpected: item.installmentCountExpected,
       submittedReceiptsCount: item.paymentReceipts.length,
-      includesEquipment: item.includesEquipment,
       hasDiscountCoupon: item.discountAppliedAmount !== null,
       receiptStatus: item.paymentReceipts[0]?.status ?? null,
       status: item.status,

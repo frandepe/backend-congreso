@@ -17,7 +17,6 @@ const listAdminCommercialSubmissionsController = async (
     commercialKind: req.query.commercialKind as string | undefined,
     commercialOptionCode: req.query.commercialOptionCode as string | undefined,
     hasDiscountCoupon: req.query.hasDiscountCoupon as string | undefined,
-    includesEquipment: req.query.includesEquipment as string | undefined,
   });
 
   sendSuccess(res, result.items, 200, result.meta);

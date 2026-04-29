@@ -113,7 +113,6 @@ const dispatchCommercialSubmissionConfirmationEmail = (input: {
   totalAmountExpected: number;
   installmentAmountExpected: number | null;
   discountAppliedAmount: number | null;
-  equipmentAdditionalAmount: number | null;
   secondInstallmentDueAt: Date | null;
 }) => {
   setImmediate(async () => {
@@ -196,7 +195,6 @@ const createCommercialSubmission = async (
         commercialKind: input.commercialKind,
         commercialOptionCode: input.commercialOptionCode,
         paymentPlanType: input.paymentPlanType,
-        includesEquipment: input.includesEquipment,
         applyStandDiscount: Boolean(resolvedCoupon),
       });
 
@@ -222,10 +220,7 @@ const createCommercialSubmission = async (
           commercialOptionLabelSnapshot: pricingSummary.option.label,
           currencyCode: "ARS",
           baseAmountExpected: pricingSummary.baseAmount,
-          equipmentAdditionalAmount:
-            pricingSummary.equipmentAdditionalAmount > 0
-              ? pricingSummary.equipmentAdditionalAmount
-              : null,
+          equipmentAdditionalAmount: null,
           discountAppliedAmount:
             pricingSummary.discountAppliedAmount > 0
               ? pricingSummary.discountAppliedAmount
@@ -237,10 +232,7 @@ const createCommercialSubmission = async (
           installmentCountExpected: pricingSummary.installmentCountExpected,
           installmentAmountExpected: pricingSummary.installmentAmount,
           secondInstallmentDueAt: pricingSummary.secondInstallmentDueAt,
-          includesEquipment:
-            input.commercialKind === "STAND"
-              ? pricingSummary.includesEquipment
-              : false,
+          includesEquipment: false,
           status: RegistrationStatus.PENDING_REVIEW,
           notes: input.notes,
         },
@@ -320,10 +312,6 @@ const createCommercialSubmission = async (
           result.commercialSubmission.discountAppliedAmount !== null
             ? Number(result.commercialSubmission.discountAppliedAmount)
             : null,
-        equipmentAdditionalAmount:
-          result.commercialSubmission.equipmentAdditionalAmount !== null
-            ? Number(result.commercialSubmission.equipmentAdditionalAmount)
-            : null,
         secondInstallmentDueAt: result.commercialSubmission.secondInstallmentDueAt,
       });
     }
@@ -338,15 +326,10 @@ const createCommercialSubmission = async (
         label: result.commercialSubmission.commercialOptionLabelSnapshot,
         companyName: result.commercialSubmission.companyName,
         baseAmountExpected: Number(result.commercialSubmission.baseAmountExpected),
-        equipmentAdditionalAmount:
-          result.commercialSubmission.equipmentAdditionalAmount !== null
-            ? Number(result.commercialSubmission.equipmentAdditionalAmount)
-            : null,
         discountAppliedAmount:
           result.commercialSubmission.discountAppliedAmount !== null
             ? Number(result.commercialSubmission.discountAppliedAmount)
             : null,
-        includesEquipment: result.commercialSubmission.includesEquipment,
         totalAmountExpected: Number(result.commercialSubmission.totalAmountExpected),
       },
       paymentPlanType: result.commercialSubmission.paymentPlanType,
