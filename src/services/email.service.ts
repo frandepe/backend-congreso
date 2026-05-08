@@ -49,9 +49,78 @@ type CommercialTrackingCodeRecoveryEmailInput = {
 };
 
 let transporter: nodemailer.Transporter | null = null;
+let smtpConfigLogged = false;
+let smtpVerifyPromise: Promise<void> | null = null;
+
+const SMTP_CONFIG = {
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000,
+} as const;
 
 const hasEmailTransportConfigured = () => {
   return Boolean(env.gmailUser && env.gmailAppPassword);
+};
+
+const nowMs = () => performance.now();
+
+const getElapsedMs = (startedAt: number) =>
+  Number((nowMs() - startedAt).toFixed(1));
+
+const getEmailDomain = (email: string) => {
+  const [, domain] = email.split("@");
+  return domain || "unknown";
+};
+
+const logEmailTransportConfig = (source: string) => {
+  if (smtpConfigLogged) {
+    return;
+  }
+
+  smtpConfigLogged = true;
+
+  console.info(
+    `[email.smtp.config] source=${source} host=${SMTP_CONFIG.host} port=${SMTP_CONFIG.port} secure=${SMTP_CONFIG.secure} connectionTimeoutMs=${SMTP_CONFIG.connectionTimeout} greetingTimeoutMs=${SMTP_CONFIG.greetingTimeout} socketTimeoutMs=${SMTP_CONFIG.socketTimeout} gmailUserConfigured=${Boolean(
+      env.gmailUser,
+    )} gmailAppPasswordConfigured=${Boolean(
+      env.gmailAppPassword,
+    )} gmailUserDomain=${env.gmailUser ? getEmailDomain(env.gmailUser) : "missing"}`,
+  );
+};
+
+const logEmailTransportConfigStatus = () => {
+  logEmailTransportConfig("startup");
+};
+
+const verifySmtpConnectionOnce = () => {
+  if (smtpVerifyPromise) {
+    return smtpVerifyPromise;
+  }
+
+  const verifyStartedAt = nowMs();
+
+  smtpVerifyPromise = getTransporter()
+    .verify()
+    .then(() => {
+      console.info(
+        `[email.smtp.verify] status=success verifyMs=${getElapsedMs(
+          verifyStartedAt,
+        )}`,
+      );
+    })
+    .catch((error) => {
+      console.error(
+        `[email.smtp.verify] status=failed verifyMs=${getElapsedMs(
+          verifyStartedAt,
+        )}`,
+        error,
+      );
+    });
+
+  return smtpVerifyPromise;
 };
 
 const formatArsCurrency = (value: number) =>
@@ -118,33 +187,58 @@ const getFrontendCatalogosLivingsUrl = () => {
 };
 
 const getTransporter = () => {
+  logEmailTransportConfig("getTransporter");
+
   if (!hasEmailTransportConfigured()) {
     throw new Error("Email transport is not configured");
   }
 
   if (!transporter) {
-    // transporter = nodemailer.createTransport({
-    //   service: "gmail",
-    //   auth: {
-    //     user: env.gmailUser,
-    //     pass: env.gmailAppPassword,
-    //   },
-    // });
     transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false, // STARTTLS
+      host: SMTP_CONFIG.host,
+      port: SMTP_CONFIG.port,
+      secure: SMTP_CONFIG.secure,
       auth: {
         user: env.gmailUser,
         pass: env.gmailAppPassword,
       },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
+      connectionTimeout: SMTP_CONFIG.connectionTimeout,
+      greetingTimeout: SMTP_CONFIG.greetingTimeout,
+      socketTimeout: SMTP_CONFIG.socketTimeout,
     });
   }
 
   return transporter;
+};
+
+const sendMailWithDiagnostics = async (
+  operation: string,
+  options: nodemailer.SendMailOptions,
+) => {
+  logEmailTransportConfig(operation);
+  void verifySmtpConnectionOnce();
+
+  const sendStartedAt = nowMs();
+
+  try {
+    const result = await getTransporter().sendMail(options);
+
+    console.info(
+      `[email.smtp.send] operation=${operation} status=success sendMailMs=${getElapsedMs(
+        sendStartedAt,
+      )} host=${SMTP_CONFIG.host} port=${SMTP_CONFIG.port} secure=${SMTP_CONFIG.secure}`,
+    );
+
+    return result;
+  } catch (error) {
+    console.error(
+      `[email.smtp.send] operation=${operation} status=failed sendMailMs=${getElapsedMs(
+        sendStartedAt,
+      )} host=${SMTP_CONFIG.host} port=${SMTP_CONFIG.port} secure=${SMTP_CONFIG.secure}`,
+      error,
+    );
+    throw error;
+  }
 };
 
 const buildEmailLayout = ({
@@ -447,7 +541,7 @@ const sendCommercialTrackingCodeRecoveryEmail = async ({
     )
     .join("");
 
-  await getTransporter().sendMail({
+  await sendMailWithDiagnostics("commercialTrackingCodeRecovery", {
     from: env.gmailUser,
     to,
     subject: "Recuperacion de codigo para stands del Congreso",
@@ -533,7 +627,7 @@ const sendInitialSubmissionConfirmationEmail = async ({
       : []),
   ];
 
-  await getTransporter().sendMail({
+  await sendMailWithDiagnostics("initialSubmissionConfirmation", {
     from: env.gmailUser,
     to,
     subject: "Recibimos tu inscripcion al Congreso",
@@ -589,7 +683,7 @@ const sendTrackingCodeRecoveryEmail = async ({
     )
     .join("");
 
-  await getTransporter().sendMail({
+  await sendMailWithDiagnostics("trackingCodeRecovery", {
     from: env.gmailUser,
     to,
     subject: "Recuperacion de codigo de inscripcion",
@@ -622,7 +716,7 @@ const sendDiscountCouponEmail = async ({
 }: DiscountCouponEmailInput) => {
   const registrationUrl = getFrontendRegistrationUrl();
 
-  await getTransporter().sendMail({
+  await sendMailWithDiagnostics("discountCoupon", {
     from: env.gmailUser,
     to,
     subject: "Tu cupon de descuento para el Congreso",
@@ -673,7 +767,7 @@ const sendCommercialSubmissionConfirmationEmail = async ({
   discountAppliedAmount,
   secondInstallmentDueAt,
 }: CommercialSubmissionConfirmationEmailInput) => {
-  await getTransporter().sendMail({
+  await sendMailWithDiagnostics("commercialSubmissionConfirmation", {
     from: env.gmailUser,
     to,
     subject: "Recibimos tu solicitud comercial para el Congreso",
@@ -696,7 +790,7 @@ const sendCommercialStandDiscountCouponEmail = async ({
   couponCode,
   expiresAt,
 }: CommercialStandDiscountCouponEmailInput) => {
-  await getTransporter().sendMail({
+  await sendMailWithDiagnostics("commercialStandDiscountCoupon", {
     from: env.gmailUser,
     to,
     subject: "Tu cupon para stand del Congreso",
@@ -711,6 +805,7 @@ export {
   buildCommercialStandDiscountCouponEmailHtml,
   buildCommercialSubmissionConfirmationEmailHtml,
   hasEmailTransportConfigured,
+  logEmailTransportConfigStatus,
   sendCommercialStandDiscountCouponEmail,
   sendCommercialSubmissionConfirmationEmail,
   sendCommercialTrackingCodeRecoveryEmail,
