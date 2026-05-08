@@ -8,6 +8,7 @@ import { apiRouter } from "./routes";
 
 const app = express();
 
+app.set("trust proxy", 1);
 app.disable("x-powered-by");
 app.use(cors(corsOptions));
 app.use(express.json());

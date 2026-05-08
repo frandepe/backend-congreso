@@ -68,6 +68,7 @@ const formatEmailDate = (value: Date) =>
 
 const getFrontendSecondInstallmentUrl = () => {
   const frontendBaseUrl = env.corsAllowedOrigins[0];
+  // const frontendBaseUrl = "https://www.congresonacionalrcp.com.ar";
 
   if (!frontendBaseUrl) {
     return "/inscripcion/segunda-cuota";
@@ -122,12 +123,24 @@ const getTransporter = () => {
   }
 
   if (!transporter) {
+    // transporter = nodemailer.createTransport({
+    //   service: "gmail",
+    //   auth: {
+    //     user: env.gmailUser,
+    //     pass: env.gmailAppPassword,
+    //   },
+    // });
     transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // STARTTLS
       auth: {
         user: env.gmailUser,
         pass: env.gmailAppPassword,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
   }
 

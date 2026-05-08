@@ -37,7 +37,7 @@ const errorMiddleware = (
       res,
       {
         code: isFileTooLarge ? "FILE_TOO_LARGE" : "UPLOAD_ERROR",
-        message: isFileTooLarge ? "File is too large" : "Upload failed",
+        message: isFileTooLarge ? "La imágen supera los 5MB" : "Upload failed",
       },
       400,
     );
