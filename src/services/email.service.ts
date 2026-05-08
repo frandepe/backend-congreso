@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { env } from "../config/env";
 
 type InitialSubmissionConfirmationEmailInput = {
@@ -48,22 +48,22 @@ type CommercialTrackingCodeRecoveryEmailInput = {
   trackingCodes: string[];
 };
 
-let transporter: nodemailer.Transporter | null = null;
-let smtpConfigLogged = false;
-let smtpVerifyPromise: Promise<void> | null = null;
+type EmailSendOptions = {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+};
 
-const SMTP_CONFIG = {
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  family: 4,
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000,
-} as const;
+let resendClient: Resend | null = null;
+let resendConfigLogged = false;
+
+const EMAIL_FROM =
+  "Congreso Nacional de RCP <noreply@congresonacionalrcp.com.ar>";
+const EMAIL_REPLY_TO = "congresonacionalrcp@gmail.com";
 
 const hasEmailTransportConfigured = () => {
-  return Boolean(env.gmailUser && env.gmailAppPassword);
+  return Boolean(env.resendApiKey);
 };
 
 const nowMs = () => performance.now();
@@ -71,57 +71,35 @@ const nowMs = () => performance.now();
 const getElapsedMs = (startedAt: number) =>
   Number((nowMs() - startedAt).toFixed(1));
 
-const getEmailDomain = (email: string) => {
-  const [, domain] = email.split("@");
+const getEmailDomain = (value: string) => {
+  const match = value.match(/<[^@<>\s]+@([^<>\s]+)>/);
+
+  if (match?.[1]) {
+    return match[1];
+  }
+
+  const [, domain] = value.split("@");
   return domain || "unknown";
 };
 
 const logEmailTransportConfig = (source: string) => {
-  if (smtpConfigLogged) {
+  if (resendConfigLogged) {
     return;
   }
 
-  smtpConfigLogged = true;
+  resendConfigLogged = true;
 
   console.info(
-    `[email.smtp.config] source=${source} host=${SMTP_CONFIG.host} port=${SMTP_CONFIG.port} secure=${SMTP_CONFIG.secure} connectionTimeoutMs=${SMTP_CONFIG.connectionTimeout} greetingTimeoutMs=${SMTP_CONFIG.greetingTimeout} socketTimeoutMs=${SMTP_CONFIG.socketTimeout} gmailUserConfigured=${Boolean(
-      env.gmailUser,
-    )} gmailAppPasswordConfigured=${Boolean(
-      env.gmailAppPassword,
-    )} gmailUserDomain=${env.gmailUser ? getEmailDomain(env.gmailUser) : "missing"}`,
+    `[email.resend.config] source=${source} apiKeyConfigured=${Boolean(
+      env.resendApiKey,
+    )} fromDomain=${getEmailDomain(EMAIL_FROM)} replyToDomain=${getEmailDomain(
+      EMAIL_REPLY_TO,
+    )}`,
   );
 };
 
 const logEmailTransportConfigStatus = () => {
   logEmailTransportConfig("startup");
-};
-
-const verifySmtpConnectionOnce = () => {
-  if (smtpVerifyPromise) {
-    return smtpVerifyPromise;
-  }
-
-  const verifyStartedAt = nowMs();
-
-  smtpVerifyPromise = getTransporter()
-    .verify()
-    .then(() => {
-      console.info(
-        `[email.smtp.verify] status=success verifyMs=${getElapsedMs(
-          verifyStartedAt,
-        )}`,
-      );
-    })
-    .catch((error) => {
-      console.error(
-        `[email.smtp.verify] status=failed verifyMs=${getElapsedMs(
-          verifyStartedAt,
-        )}`,
-        error,
-      );
-    });
-
-  return smtpVerifyPromise;
 };
 
 const formatArsCurrency = (value: number) =>
@@ -187,56 +165,60 @@ const getFrontendCatalogosLivingsUrl = () => {
   return `${frontendBaseUrl.replace(/\/+$/, "")}/catalogos-livings`;
 };
 
-const getTransporter = () => {
-  logEmailTransportConfig("getTransporter");
+const getResendClient = () => {
+  logEmailTransportConfig("getResendClient");
 
   if (!hasEmailTransportConfigured()) {
     throw new Error("Email transport is not configured");
   }
 
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: SMTP_CONFIG.host,
-      port: SMTP_CONFIG.port,
-      secure: SMTP_CONFIG.secure,
-      auth: {
-        user: env.gmailUser,
-        pass: env.gmailAppPassword,
-      },
-      connectionTimeout: SMTP_CONFIG.connectionTimeout,
-      greetingTimeout: SMTP_CONFIG.greetingTimeout,
-      socketTimeout: SMTP_CONFIG.socketTimeout,
-    });
+  if (!resendClient) {
+    resendClient = new Resend(env.resendApiKey);
   }
 
-  return transporter;
+  return resendClient;
 };
 
-const sendMailWithDiagnostics = async (
+const sendEmailWithDiagnostics = async (
   operation: string,
-  options: nodemailer.SendMailOptions,
+  options: EmailSendOptions,
 ) => {
   logEmailTransportConfig(operation);
-  void verifySmtpConnectionOnce();
 
   const sendStartedAt = nowMs();
 
   try {
-    const result = await getTransporter().sendMail(options);
+    const result = await getResendClient().emails.send({
+      from: EMAIL_FROM,
+      to: options.to,
+      replyTo: EMAIL_REPLY_TO,
+      subject: options.subject,
+      html: options.html,
+      ...(options.text ? { text: options.text } : {}),
+    });
+
+    if (result.error) {
+      throw new Error(
+        `${result.error.name}: ${result.error.message}`,
+      );
+    }
 
     console.info(
-      `[email.smtp.send] operation=${operation} status=success sendMailMs=${getElapsedMs(
+      `[email.resend.send] operation=${operation} status=success sendMs=${getElapsedMs(
         sendStartedAt,
-      )} host=${SMTP_CONFIG.host} port=${SMTP_CONFIG.port} secure=${SMTP_CONFIG.secure}`,
+      )} providerMessageId=${result.data?.id ?? "missing"}`,
     );
 
     return result;
   } catch (error) {
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown email error";
+
     console.error(
-      `[email.smtp.send] operation=${operation} status=failed sendMailMs=${getElapsedMs(
+      `[email.resend.send] operation=${operation} status=failed sendMs=${getElapsedMs(
         sendStartedAt,
-      )} host=${SMTP_CONFIG.host} port=${SMTP_CONFIG.port} secure=${SMTP_CONFIG.secure}`,
-      error,
+      )} errorName=${errorName} errorMessage=${errorMessage}`,
     );
     throw error;
   }
@@ -542,8 +524,7 @@ const sendCommercialTrackingCodeRecoveryEmail = async ({
     )
     .join("");
 
-  await sendMailWithDiagnostics("commercialTrackingCodeRecovery", {
-    from: env.gmailUser,
+  await sendEmailWithDiagnostics("commercialTrackingCodeRecovery", {
     to,
     subject: "Recuperacion de codigo para stands del Congreso",
     html: buildEmailLayout({
@@ -628,8 +609,7 @@ const sendInitialSubmissionConfirmationEmail = async ({
       : []),
   ];
 
-  await sendMailWithDiagnostics("initialSubmissionConfirmation", {
-    from: env.gmailUser,
+  await sendEmailWithDiagnostics("initialSubmissionConfirmation", {
     to,
     subject: "Recibimos tu inscripcion al Congreso",
     html: buildEmailLayout({
@@ -684,8 +664,7 @@ const sendTrackingCodeRecoveryEmail = async ({
     )
     .join("");
 
-  await sendMailWithDiagnostics("trackingCodeRecovery", {
-    from: env.gmailUser,
+  await sendEmailWithDiagnostics("trackingCodeRecovery", {
     to,
     subject: "Recuperacion de codigo de inscripcion",
     html: buildEmailLayout({
@@ -717,8 +696,7 @@ const sendDiscountCouponEmail = async ({
 }: DiscountCouponEmailInput) => {
   const registrationUrl = getFrontendRegistrationUrl();
 
-  await sendMailWithDiagnostics("discountCoupon", {
-    from: env.gmailUser,
+  await sendEmailWithDiagnostics("discountCoupon", {
     to,
     subject: "Tu cupon de descuento para el Congreso",
     html: buildEmailLayout({
@@ -768,8 +746,7 @@ const sendCommercialSubmissionConfirmationEmail = async ({
   discountAppliedAmount,
   secondInstallmentDueAt,
 }: CommercialSubmissionConfirmationEmailInput) => {
-  await sendMailWithDiagnostics("commercialSubmissionConfirmation", {
-    from: env.gmailUser,
+  await sendEmailWithDiagnostics("commercialSubmissionConfirmation", {
     to,
     subject: "Recibimos tu solicitud comercial para el Congreso",
     html: buildCommercialSubmissionConfirmationEmailHtml({
@@ -791,8 +768,7 @@ const sendCommercialStandDiscountCouponEmail = async ({
   couponCode,
   expiresAt,
 }: CommercialStandDiscountCouponEmailInput) => {
-  await sendMailWithDiagnostics("commercialStandDiscountCoupon", {
-    from: env.gmailUser,
+  await sendEmailWithDiagnostics("commercialStandDiscountCoupon", {
     to,
     subject: "Tu cupon para stand del Congreso",
     html: buildCommercialStandDiscountCouponEmailHtml({

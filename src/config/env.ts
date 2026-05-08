@@ -42,6 +42,7 @@ export const env = {
   databaseUrl: process.env.DATABASE_URL ?? "",
   jwtSecret: process.env.JWT_SECRET ?? "",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "1d",
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
   gmailUser: process.env.GMAIL_USER ?? "",
   gmailAppPassword: process.env.GMAIL_APP_PASSWORD ?? "",
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
