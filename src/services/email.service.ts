@@ -18,6 +18,16 @@ type TrackingCodeRecoveryEmailInput = {
   trackingCodes: string[];
 };
 
+type SecondInstallmentConfirmationEmailInput = {
+  to: string;
+  trackingCode: string;
+  registrationOptionLabel: string;
+  totalAmountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  paymentDate: Date | null;
+};
+
 type DiscountCouponEmailInput = {
   to: string;
   couponCode: string;
@@ -35,6 +45,18 @@ type CommercialSubmissionConfirmationEmailInput = {
   installmentAmountExpected: number | null;
   discountAppliedAmount: number | null;
   secondInstallmentDueAt: Date | null;
+};
+
+type CommercialSecondInstallmentConfirmationEmailInput = {
+  to: string;
+  trackingCode: string;
+  commercialKindLabel: string;
+  commercialOptionLabel: string;
+  companyName: string;
+  totalAmountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  paymentDate: Date | null;
 };
 
 type CommercialStandDiscountCouponEmailInput = {
@@ -689,6 +711,82 @@ const sendTrackingCodeRecoveryEmail = async ({
   });
 };
 
+const sendSecondInstallmentConfirmationEmail = async ({
+  to,
+  trackingCode,
+  registrationOptionLabel,
+  totalAmountExpected,
+  installmentAmountExpected,
+  secondInstallmentDueAt,
+  paymentDate,
+}: SecondInstallmentConfirmationEmailInput) => {
+  const infoBlocks = [
+    {
+      label: "Codigo de seguimiento",
+      value: trackingCode,
+      tone: "success" as const,
+    },
+    {
+      label: "Inscripcion",
+      value: registrationOptionLabel,
+    },
+    {
+      label: "Cuota informada",
+      value: "Cuota 2",
+      tone: "success" as const,
+    },
+    {
+      label: "Total esperado",
+      value: formatArsCurrency(totalAmountExpected),
+    },
+    ...(installmentAmountExpected !== null
+      ? [
+          {
+            label: "Importe de este envio",
+            value: formatArsCurrency(installmentAmountExpected),
+          },
+        ]
+      : []),
+    ...(paymentDate
+      ? [
+          {
+            label: "Fecha de pago informada",
+            value: formatEmailDate(paymentDate),
+          },
+        ]
+      : []),
+    ...(secondInstallmentDueAt
+      ? [
+          {
+            label: "Vencimiento cuota 2",
+            value: formatEmailDate(secondInstallmentDueAt),
+          },
+        ]
+      : []),
+  ];
+
+  await sendEmailWithDiagnostics("secondInstallmentConfirmation", {
+    to,
+    subject: "Recibimos tu comprobante de segunda cuota",
+    html: buildEmailLayout({
+      eyebrow: "Segunda cuota recibida",
+      title: "Recibimos tu comprobante",
+      intro:
+        "Tu comprobante de segunda cuota quedo registrado y ahora pasa a revision manual por parte del comite organizador.",
+      content: `
+        ${buildInfoGrid(infoBlocks)}
+        <div style="margin-top:22px;">
+          ${buildParagraph(
+            "Guarda este codigo de seguimiento para consultar el estado actualizado de tu inscripcion.",
+          )}
+        </div>
+      `,
+      footer:
+        "Este correo fue enviado automaticamente por el sistema de inscripciones del Congreso Nacional de RCP.",
+    }),
+  });
+};
+
 const sendDiscountCouponEmail = async ({
   to,
   couponCode,
@@ -763,6 +861,92 @@ const sendCommercialSubmissionConfirmationEmail = async ({
   });
 };
 
+const sendCommercialSecondInstallmentConfirmationEmail = async ({
+  to,
+  trackingCode,
+  commercialKindLabel,
+  commercialOptionLabel,
+  companyName,
+  totalAmountExpected,
+  installmentAmountExpected,
+  secondInstallmentDueAt,
+  paymentDate,
+}: CommercialSecondInstallmentConfirmationEmailInput) => {
+  const infoBlocks = [
+    {
+      label: "Codigo de seguimiento",
+      value: trackingCode,
+      tone: "success" as const,
+    },
+    {
+      label: "Tipo",
+      value: commercialKindLabel,
+    },
+    {
+      label: "Opcion",
+      value: commercialOptionLabel,
+    },
+    {
+      label: "Empresa",
+      value: companyName,
+    },
+    {
+      label: "Cuota informada",
+      value: "Cuota 2",
+      tone: "success" as const,
+    },
+    {
+      label: "Total esperado",
+      value: formatArsCurrency(totalAmountExpected),
+    },
+    ...(installmentAmountExpected !== null
+      ? [
+          {
+            label: "Importe de este envio",
+            value: formatArsCurrency(installmentAmountExpected),
+          },
+        ]
+      : []),
+    ...(paymentDate
+      ? [
+          {
+            label: "Fecha de pago informada",
+            value: formatEmailDate(paymentDate),
+          },
+        ]
+      : []),
+    ...(secondInstallmentDueAt
+      ? [
+          {
+            label: "Vencimiento cuota 2",
+            value: formatEmailDate(secondInstallmentDueAt),
+          },
+        ]
+      : []),
+  ];
+
+  await sendEmailWithDiagnostics("commercialSecondInstallmentConfirmation", {
+    to,
+    subject: "Recibimos tu comprobante de segunda cuota comercial",
+    html: buildEmailLayout({
+      eyebrow: "Segunda cuota comercial recibida",
+      title: "Recibimos tu comprobante",
+      intro:
+        "Tu comprobante de segunda cuota quedo registrado y ahora pasa a revision manual por parte del comite organizador.",
+      content: `
+        ${buildInfoGrid(infoBlocks)}
+        <div style="margin-top:22px;">
+          ${buildParagraph(
+            "Guarda este codigo de seguimiento para consultar el estado actualizado de tu solicitud comercial.",
+          )}
+        </div>
+      `,
+      footer:
+        "Este correo fue enviado automaticamente por el sistema de inscripciones del Congreso Nacional de RCP.",
+    }),
+  });
+};
+
 const sendCommercialStandDiscountCouponEmail = async ({
   to,
   couponCode,
@@ -783,10 +967,12 @@ export {
   buildCommercialSubmissionConfirmationEmailHtml,
   hasEmailTransportConfigured,
   logEmailTransportConfigStatus,
+  sendCommercialSecondInstallmentConfirmationEmail,
   sendCommercialStandDiscountCouponEmail,
   sendCommercialSubmissionConfirmationEmail,
   sendCommercialTrackingCodeRecoveryEmail,
   sendDiscountCouponEmail,
   sendInitialSubmissionConfirmationEmail,
+  sendSecondInstallmentConfirmationEmail,
   sendTrackingCodeRecoveryEmail,
 };

@@ -57,7 +57,9 @@ const createUniqueCommercialCouponCode = async (
 ) => {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = generateCommercialDiscountCouponCode();
-    const existingCoupon = await (tx as any).commercialDiscountCoupon.findUnique({
+    const existingCoupon = await (
+      tx as any
+    ).commercialDiscountCoupon.findUnique({
       where: {
         code,
       },
@@ -91,7 +93,8 @@ const requestCommercialStandDiscountCoupon = async ({
   if (!eligibleExhibitor || !eligibleExhibitor.isActive) {
     return {
       issued: false,
-      message: "Ese email no esta habilitado para descuento de stand.",
+      message:
+        "Si participaste en un stand del primer congreso y este email no fue reconocido para el descuento, escribinos a congresonacionalrcp@gmail.com indicando DNI, nombre y apellido antes de completar el formulario.",
       expiresAt: null,
     };
   }
@@ -106,7 +109,8 @@ const requestCommercialStandDiscountCoupon = async ({
   if (discountAlreadyUsed) {
     return {
       issued: false,
-      message: "Ese email ya uso su descuento en una contratacion previa de stand.",
+      message:
+        "Ese email ya uso su descuento en una contratacion previa de stand.",
       expiresAt: null,
     };
   }
@@ -178,7 +182,8 @@ const validateCommercialStandDiscountCoupon = async ({
   if (alreadyUsedDiscount) {
     return {
       valid: false,
-      message: "Ese email ya uso su descuento en una contratacion previa de stand.",
+      message:
+        "Ese email ya uso su descuento en una contratacion previa de stand.",
       discountAmount: null,
       expiresAt: null,
     };
@@ -217,10 +222,7 @@ const validateCommercialStandDiscountCoupon = async ({
     };
   }
 
-  if (
-    coupon.status === "EXPIRED" ||
-    coupon.expiresAt.getTime() <= Date.now()
-  ) {
+  if (coupon.status === "EXPIRED" || coupon.expiresAt.getTime() <= Date.now()) {
     if (coupon.status === "ISSUED") {
       await prismaAny.commercialDiscountCoupon.update({
         where: {
@@ -321,10 +323,7 @@ const resolveCommercialStandCouponForSubmission = async ({
     );
   }
 
-  if (
-    coupon.status === "EXPIRED" ||
-    coupon.expiresAt.getTime() <= Date.now()
-  ) {
+  if (coupon.status === "EXPIRED" || coupon.expiresAt.getTime() <= Date.now()) {
     if (coupon.status === "ISSUED") {
       await (tx as any).commercialDiscountCoupon.update({
         where: {

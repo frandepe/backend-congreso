@@ -36,6 +36,70 @@ const getReceiptStatusForSubmissionStatus = (status?: string) => {
   return null;
 };
 
+const syncCommercialReceiptStatusesForSubmissionStatus = async ({
+  tx,
+  submissionId,
+  status,
+  reviewedAt,
+  adminId,
+}: {
+  tx: Prisma.TransactionClient;
+  submissionId: string;
+  status: string;
+  reviewedAt: Date;
+  adminId: string;
+}) => {
+  if (status === "PARTIALLY_PAID") {
+    await tx.commercialPaymentReceipt.updateMany({
+      where: {
+        commercialSubmissionId: submissionId,
+        installmentNumber: 1,
+      },
+      data: {
+        status: PaymentReceiptStatus.APPROVED,
+        rejectionReason: null,
+        reviewedAt,
+        reviewedByAdminId: adminId,
+      },
+    });
+
+    await tx.commercialPaymentReceipt.updateMany({
+      where: {
+        commercialSubmissionId: submissionId,
+        installmentNumber: {
+          not: 1,
+        },
+      },
+      data: {
+        status: PaymentReceiptStatus.PENDING_REVIEW,
+        rejectionReason: null,
+        reviewedAt: null,
+        reviewedByAdminId: null,
+      },
+    });
+
+    return;
+  }
+
+  const receiptStatus = getReceiptStatusForSubmissionStatus(status);
+
+  if (!receiptStatus) {
+    return;
+  }
+
+  await tx.commercialPaymentReceipt.updateMany({
+    where: {
+      commercialSubmissionId: submissionId,
+    },
+    data: {
+      status: receiptStatus,
+      rejectionReason: null,
+      reviewedAt,
+      reviewedByAdminId: adminId,
+    },
+  });
+};
+
 const buildWhere = ({
   status,
   commercialKind,
@@ -266,21 +330,13 @@ const updateAdminCommercialSubmission = async ({
 
   const updatedSubmission = await prisma.$transaction(async (tx) => {
     if (status !== undefined && existingSubmission.paymentReceipts.length > 0) {
-      const receiptStatus = getReceiptStatusForSubmissionStatus(status);
-
-      if (receiptStatus) {
-        await tx.commercialPaymentReceipt.updateMany({
-          where: {
-            commercialSubmissionId: submissionId,
-          },
-          data: {
-            status: receiptStatus,
-            rejectionReason: null,
-            reviewedAt,
-            reviewedByAdminId: admin.id,
-          },
-        });
-      }
+      await syncCommercialReceiptStatusesForSubmissionStatus({
+        tx,
+        submissionId,
+        status,
+        reviewedAt,
+        adminId: admin.id,
+      });
     }
 
     return tx.commercialSubmission.update({

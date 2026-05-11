@@ -15,6 +15,7 @@ import {
 import {
   hasEmailTransportConfigured,
   sendInitialSubmissionConfirmationEmail,
+  sendSecondInstallmentConfirmationEmail,
   sendTrackingCodeRecoveryEmail,
 } from "./email.service";
 import {
@@ -93,6 +94,24 @@ const isSecondInstallmentExpired = (dueAt: Date | null, now: Date = new Date()) 
   return now.getTime() > dueAt.getTime();
 };
 
+const getPublicReceiptStatus = ({
+  submissionStatus,
+  receiptStatus,
+  installmentNumber,
+}: {
+  submissionStatus: RegistrationStatus;
+  receiptStatus: PaymentReceiptStatus;
+  installmentNumber: number;
+}) => {
+  if (submissionStatus === RegistrationStatus.PARTIALLY_PAID) {
+    return installmentNumber === 1
+      ? PaymentReceiptStatus.APPROVED
+      : PaymentReceiptStatus.PENDING_REVIEW;
+  }
+
+  return receiptStatus;
+};
+
 const logInitialSubmissionTiming = (data: {
   registrationOptionCode: string;
   paymentPlanType: string;
@@ -133,6 +152,36 @@ const dispatchInitialSubmissionConfirmationEmail = (input: {
     } catch (error) {
       console.error(
         `[submissions.createInitial.email] status=failed trackingCode=${input.trackingCode} emailMs=${getElapsedMs(
+          emailStartedAt,
+        )}`,
+        error,
+      );
+    }
+  });
+};
+
+const dispatchSecondInstallmentConfirmationEmail = (input: {
+  to: string;
+  trackingCode: string;
+  registrationOptionLabel: string;
+  totalAmountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  paymentDate: Date | null;
+}) => {
+  setImmediate(async () => {
+    const emailStartedAt = nowMs();
+
+    try {
+      await sendSecondInstallmentConfirmationEmail(input);
+      console.info(
+        `[submissions.createAdditionalReceipt.email] status=sent trackingCode=${input.trackingCode} emailMs=${getElapsedMs(
+          emailStartedAt,
+        )}`,
+      );
+    } catch (error) {
+      console.error(
+        `[submissions.createAdditionalReceipt.email] status=failed trackingCode=${input.trackingCode} emailMs=${getElapsedMs(
           emailStartedAt,
         )}`,
         error,
@@ -460,9 +509,27 @@ const createAdditionalReceipt = async (
       };
     });
 
+    const trackingCode = formatTrackingCode(result.registrationSubmission.id);
+
+    if (hasEmailTransportConfigured()) {
+      dispatchSecondInstallmentConfirmationEmail({
+        to: existingSubmission.email,
+        trackingCode,
+        registrationOptionLabel:
+          existingSubmission.registrationOptionLabelSnapshot,
+        totalAmountExpected: Number(existingSubmission.totalAmountExpected),
+        installmentAmountExpected:
+          existingSubmissionInstallmentAmount != null
+            ? Number(existingSubmissionInstallmentAmount)
+            : null,
+        secondInstallmentDueAt: resolvedSecondInstallmentDueAt,
+        paymentDate: result.paymentReceipt.paymentDate,
+      });
+    }
+
     return toPublicAdditionalReceiptCreatedDto({
       registrationId: result.registrationSubmission.id,
-      trackingCode: formatTrackingCode(result.registrationSubmission.id),
+      trackingCode,
       status: result.registrationSubmission.status,
       paymentPlanType: existingSubmission.paymentPlanType,
       installmentCountExpected: existingSubmission.installmentCountExpected,
@@ -523,10 +590,19 @@ const getPublicSubmissionStatus = async (
     );
   }
 
-  const approvedReceiptsCount = submission.paymentReceipts.filter(
+  const publicReceipts = submission.paymentReceipts.map((receipt) => ({
+    installmentNumber: receipt.installmentNumber,
+    status: getPublicReceiptStatus({
+      submissionStatus: submission.status,
+      receiptStatus: receipt.status,
+      installmentNumber: receipt.installmentNumber,
+    }),
+    createdAt: receipt.createdAt,
+  }));
+  const approvedReceiptsCount = publicReceipts.filter(
     (receipt) => receipt.status === PaymentReceiptStatus.APPROVED,
   ).length;
-  const pendingReceiptsCount = submission.paymentReceipts.filter(
+  const pendingReceiptsCount = publicReceipts.filter(
     (receipt) => receipt.status === PaymentReceiptStatus.PENDING_REVIEW,
   ).length;
   const submissionSecondInstallmentDueAt = (submission as any)
@@ -567,11 +643,7 @@ const getPublicSubmissionStatus = async (
     submittedReceiptsCount: submission.paymentReceipts.length,
     approvedReceiptsCount,
     pendingReceiptsCount,
-    receipts: submission.paymentReceipts.map((receipt) => ({
-      installmentNumber: receipt.installmentNumber,
-      status: receipt.status,
-      createdAt: receipt.createdAt,
-    })),
+    receipts: publicReceipts,
   });
 };
 

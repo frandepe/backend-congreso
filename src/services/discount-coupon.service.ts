@@ -25,7 +25,9 @@ const getCouponExpirationDate = () => {
   );
 };
 
-const getDiscountAlreadyUsedWhere = (email: string): Prisma.RegistrationSubmissionWhereInput => {
+const getDiscountAlreadyUsedWhere = (
+  email: string,
+): Prisma.RegistrationSubmissionWhereInput => {
   return {
     discountEligibleEmailNormalized: email,
   } as Prisma.RegistrationSubmissionWhereInput;
@@ -86,7 +88,8 @@ const requestDiscountCoupon = async ({
   if (!eligibleParticipant || !eligibleParticipant.isActive) {
     return {
       issued: false,
-      message: "Ese email no esta habilitado para descuento.",
+      message:
+        "Si participaste del primer congreso y este email no fue reconocido para el descuento, escribinos a congresonacionalrcp@gmail.com indicando DNI, nombre y apellido antes de completar el formulario.",
       expiresAt: null,
     };
   }
@@ -210,10 +213,7 @@ const validateDiscountCoupon = async ({
     };
   }
 
-  if (
-    coupon.status === "EXPIRED" ||
-    coupon.expiresAt.getTime() <= Date.now()
-  ) {
+  if (coupon.status === "EXPIRED" || coupon.expiresAt.getTime() <= Date.now()) {
     if (coupon.status === "ISSUED") {
       await prismaAny.discountCoupon.update({
         where: {
@@ -312,10 +312,7 @@ const resolveCouponForSubmission = async ({
     );
   }
 
-  if (
-    coupon.status === "EXPIRED" ||
-    coupon.expiresAt.getTime() <= Date.now()
-  ) {
+  if (coupon.status === "EXPIRED" || coupon.expiresAt.getTime() <= Date.now()) {
     if (coupon.status === "ISSUED") {
       await (tx as any).discountCoupon.update({
         where: {
@@ -327,11 +324,7 @@ const resolveCouponForSubmission = async ({
       });
     }
 
-    throw new HttpError(
-      400,
-      "DISCOUNT_COUPON_EXPIRED",
-      "Ese cupon ya expiro",
-    );
+    throw new HttpError(400, "DISCOUNT_COUPON_EXPIRED", "Ese cupon ya expiro");
   }
 
   return {

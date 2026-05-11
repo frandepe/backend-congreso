@@ -20,6 +20,7 @@ import {
 } from "./receipt-upload.service";
 import {
   hasEmailTransportConfigured,
+  sendCommercialSecondInstallmentConfirmationEmail,
   sendCommercialSubmissionConfirmationEmail,
   sendCommercialTrackingCodeRecoveryEmail,
 } from "./email.service";
@@ -84,6 +85,24 @@ const isCommercialSecondInstallmentExpired = (
   }
 
   return now.getTime() > dueAt.getTime();
+};
+
+const getPublicCommercialReceiptStatus = ({
+  submissionStatus,
+  receiptStatus,
+  installmentNumber,
+}: {
+  submissionStatus: RegistrationStatus;
+  receiptStatus: PaymentReceiptStatus;
+  installmentNumber: number;
+}) => {
+  if (submissionStatus === RegistrationStatus.PARTIALLY_PAID) {
+    return installmentNumber === 1
+      ? PaymentReceiptStatus.APPROVED
+      : PaymentReceiptStatus.PENDING_REVIEW;
+  }
+
+  return receiptStatus;
 };
 
 const logCommercialSubmissionTiming = (data: {
@@ -474,9 +493,31 @@ const createCommercialAdditionalReceipt = async (
       )}`,
     );
 
+    const trackingCode = formatCommercialTrackingCode(existingSubmission.id);
+
+    if (hasEmailTransportConfigured()) {
+      dispatchCommercialSecondInstallmentConfirmationEmail({
+        to: existingSubmission.email,
+        trackingCode,
+        commercialKindLabel: getCommercialKindLabel(
+          existingSubmission.commercialKind,
+        ),
+        commercialOptionLabel:
+          existingSubmission.commercialOptionLabelSnapshot,
+        companyName: existingSubmission.companyName,
+        totalAmountExpected: Number(existingSubmission.totalAmountExpected),
+        installmentAmountExpected:
+          existingSubmission.installmentAmountExpected !== null
+            ? Number(existingSubmission.installmentAmountExpected)
+            : null,
+        secondInstallmentDueAt: existingDueAt,
+        paymentDate: result.paymentReceipt.paymentDate,
+      });
+    }
+
     return toCommercialAdditionalReceiptCreatedDto({
       submissionId: existingSubmission.id,
-      trackingCode: formatCommercialTrackingCode(existingSubmission.id),
+      trackingCode,
       status: existingSubmission.status,
       paymentPlanType: existingSubmission.paymentPlanType,
       installmentCountExpected: existingSubmission.installmentCountExpected,
@@ -536,10 +577,19 @@ const getCommercialSubmissionStatus = async (
   const secondInstallmentExpired = isCommercialSecondInstallmentExpired(
     resolvedSecondInstallmentDueAt,
   );
-  const approvedReceiptsCount = submission.paymentReceipts.filter(
+  const publicReceipts = submission.paymentReceipts.map((receipt) => ({
+    installmentNumber: receipt.installmentNumber,
+    status: getPublicCommercialReceiptStatus({
+      submissionStatus: submission.status,
+      receiptStatus: receipt.status,
+      installmentNumber: receipt.installmentNumber,
+    }),
+    createdAt: receipt.createdAt,
+  }));
+  const approvedReceiptsCount = publicReceipts.filter(
     (receipt) => receipt.status === PaymentReceiptStatus.APPROVED,
   ).length;
-  const pendingReceiptsCount = submission.paymentReceipts.filter(
+  const pendingReceiptsCount = publicReceipts.filter(
     (receipt) => receipt.status === PaymentReceiptStatus.PENDING_REVIEW,
   ).length;
   const secondInstallmentUploadAllowed =
@@ -572,11 +622,39 @@ const getCommercialSubmissionStatus = async (
     submittedReceiptsCount: submission.paymentReceipts.length,
     approvedReceiptsCount,
     pendingReceiptsCount,
-    receipts: submission.paymentReceipts.map((receipt) => ({
-      installmentNumber: receipt.installmentNumber,
-      status: receipt.status,
-      createdAt: receipt.createdAt,
-    })),
+    receipts: publicReceipts,
+  });
+};
+
+const dispatchCommercialSecondInstallmentConfirmationEmail = (input: {
+  to: string;
+  trackingCode: string;
+  commercialKindLabel: string;
+  commercialOptionLabel: string;
+  companyName: string;
+  totalAmountExpected: number;
+  installmentAmountExpected: number | null;
+  secondInstallmentDueAt: Date | null;
+  paymentDate: Date | null;
+}) => {
+  setImmediate(async () => {
+    const emailStartedAt = nowMs();
+
+    try {
+      await sendCommercialSecondInstallmentConfirmationEmail(input);
+      console.info(
+        `[commercial-submissions.additional-receipt.email] status=sent trackingCode=${input.trackingCode} emailMs=${getElapsedMs(
+          emailStartedAt,
+        )}`,
+      );
+    } catch (error) {
+      console.error(
+        `[commercial-submissions.additional-receipt.email] status=failed trackingCode=${input.trackingCode} emailMs=${getElapsedMs(
+          emailStartedAt,
+        )}`,
+        error,
+      );
+    }
   });
 };
 
