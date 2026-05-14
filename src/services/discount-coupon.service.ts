@@ -89,7 +89,7 @@ const requestDiscountCoupon = async ({
     return {
       issued: false,
       message:
-        "Si participaste del primer congreso y este email no fue reconocido para el descuento, escribinos a congresonacionalrcp@gmail.com indicando DNI, nombre y apellido antes de completar el formulario.",
+        "Email no encontrado. Si participaste del primer congreso y este email no fue reconocido para el descuento, escribinos a congresonacionalrcp@gmail.com indicando DNI, nombre y apellido antes de completar el formulario.",
       expiresAt: null,
     };
   }
