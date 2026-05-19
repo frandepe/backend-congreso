@@ -34,6 +34,12 @@ type DiscountCouponEmailInput = {
   expiresAt: Date;
 };
 
+type ApprovedSubmissionEmailInput = {
+  to: string;
+  firstName: string;
+  lastName: string;
+};
+
 type CommercialSubmissionConfirmationEmailInput = {
   to: string;
   trackingCode: string;
@@ -63,6 +69,16 @@ type CommercialStandDiscountCouponEmailInput = {
   to: string;
   couponCode: string;
   expiresAt: Date;
+};
+
+type ApprovedCommercialSubmissionEmailInput = {
+  to: string;
+  contactFirstName: string;
+  contactLastName: string;
+  companyName: string;
+  commercialKindLabel: string;
+  commercialOptionLabel: string;
+  includeCatalogosLivingsLink?: boolean;
 };
 
 type CommercialTrackingCodeRecoveryEmailInput = {
@@ -136,55 +152,43 @@ const formatEmailDate = (value: Date) =>
     timeZone: "America/Buenos_Aires",
   });
 
-const getFrontendSecondInstallmentUrl = () => {
+const getFrontendUrl = (path: string) => {
   const frontendBaseUrl = env.corsAllowedOrigins[0];
-  // const frontendBaseUrl = "https://www.congresonacionalrcp.com.ar";
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
   if (!frontendBaseUrl) {
-    return "/inscripcion/segunda-cuota";
+    return normalizedPath;
   }
 
-  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/segunda-cuota`;
+  return `${frontendBaseUrl.replace(/\/+$/, "")}${normalizedPath}`;
+};
+
+const getFrontendSecondInstallmentUrl = () => {
+  return getFrontendUrl("/inscripcion/segunda-cuota");
 };
 
 const getFrontendRegistrationUrl = () => {
-  const frontendBaseUrl = env.corsAllowedOrigins[0];
-
-  if (!frontendBaseUrl) {
-    return "/inscripcion/participantes";
-  }
-
-  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/participantes`;
+  return getFrontendUrl("/inscripcion/participantes");
 };
 
 const getFrontendExhibitorsUrl = () => {
-  const frontendBaseUrl = env.corsAllowedOrigins[0];
-
-  if (!frontendBaseUrl) {
-    return "/inscripcion/expositores";
-  }
-
-  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/expositores`;
+  return getFrontendUrl("/inscripcion/expositores");
 };
 
 const getFrontendCommercialSecondInstallmentUrl = () => {
-  const frontendBaseUrl = env.corsAllowedOrigins[0];
-
-  if (!frontendBaseUrl) {
-    return "/inscripcion/comercial/segunda-cuota";
-  }
-
-  return `${frontendBaseUrl.replace(/\/+$/, "")}/inscripcion/comercial/segunda-cuota`;
+  return getFrontendUrl("/inscripcion/comercial/segunda-cuota");
 };
 
 const getFrontendCatalogosLivingsUrl = () => {
-  const frontendBaseUrl = env.corsAllowedOrigins[0];
+  return getFrontendUrl("/catalogos-livings");
+};
 
-  if (!frontendBaseUrl) {
-    return "/catalogos-livings";
-  }
+const getFrontendAccommodationUrl = () => {
+  return getFrontendUrl("/ubicacion-y-alojamiento");
+};
 
-  return `${frontendBaseUrl.replace(/\/+$/, "")}/catalogos-livings`;
+const getFrontendProgramUrl = () => {
+  return getFrontendUrl("/programa");
 };
 
 const getResendClient = () => {
@@ -379,6 +383,169 @@ const buildActionBlock = ({
 
 const buildParagraph = (text: string) => {
   return `<div style="margin:0 0 14px;font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#44403c;">${text}</div>`;
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const buildApprovedSubmissionEmailHtml = ({
+  firstName,
+  lastName,
+}: Omit<ApprovedSubmissionEmailInput, "to">) => {
+  const participantName = escapeHtml(`${firstName} ${lastName}`.trim());
+  const accommodationUrl = getFrontendAccommodationUrl();
+  const programUrl = getFrontendProgramUrl();
+
+  return buildEmailLayout({
+    eyebrow: "Inscripcion aprobada",
+    title: "Bienvenido al Congreso Nacional de RCP",
+    intro:
+      "Tu inscripcion fue aprobada por el comite organizador. Te esperamos en el congreso.",
+    content: `
+      ${buildParagraph(`Estimado/a ${participantName}:`)}
+      ${buildParagraph(
+        'Mi nombre es Nicolas De Paulo y en nombre del comite organizador del "Segundo congreso nacional de instructores de RCP" tengo el agrado de informarle que su inscripcion se realizo con exito. De esta manera le damos la bienvenida a nuestro segundo congreso a realizarse los dias 2, 3 y 4 de Octubre.',
+      )}
+      ${buildParagraph(
+        "Valoramos mucho que seas parte y deseamos que este congreso marque un antes y un despues en tu camino profesional.",
+      )}
+      ${buildParagraph(
+        "Le recordamos que en nuestra pagina encontrara toda la informacion necesaria para su estadia y participacion.",
+      )}
+      ${buildActionBlock({
+        label: "Ver ubicacion y alojamiento",
+        href: accommodationUrl,
+        helper:
+          "Consulta informacion util para organizar tu estadia durante el congreso.",
+      })}
+      ${buildActionBlock({
+        label: "Ver programa",
+        href: programUrl,
+        helper:
+          "Revisa actividades, charlas y horarios publicados por el congreso.",
+      })}
+      <div style="margin-top:22px;">
+        ${buildParagraph("Lo saluda muy atte.-")}
+        ${buildParagraph("NICOLAS DE PAULO")}
+      </div>
+    `,
+    footer:
+      "Este correo fue enviado automaticamente por el sistema de inscripciones del Congreso Nacional de RCP.",
+  });
+};
+
+const buildApprovedSubmissionEmailText = ({
+  firstName,
+  lastName,
+}: Omit<ApprovedSubmissionEmailInput, "to">) => {
+  const participantName = `${firstName} ${lastName}`.trim();
+
+  return [
+    `Estimado/a ${participantName}:`,
+    "",
+    'Mi nombre es Nicolas De Paulo y en nombre del comite organizador del "Segundo congreso nacional de instructores de RCP" tengo el agrado de informarle que su inscripcion se realizo con exito. De esta manera le damos la bienvenida a nuestro segundo congreso a realizarse los dias 2, 3 y 4 de Octubre.',
+    "",
+    "Valoramos mucho que seas parte y deseamos que este congreso marque un antes y un despues en tu camino profesional.",
+    "",
+    "Informacion util:",
+    `Ubicacion y alojamiento: ${getFrontendAccommodationUrl()}`,
+    `Programa: ${getFrontendProgramUrl()}`,
+    "",
+    "Lo saluda muy atte.-",
+    "NICOLAS DE PAULO",
+  ].join("\n");
+};
+
+const buildApprovedCommercialSubmissionEmailHtml = ({
+  contactFirstName,
+  contactLastName,
+  companyName,
+  commercialKindLabel,
+  commercialOptionLabel,
+  includeCatalogosLivingsLink,
+}: Omit<ApprovedCommercialSubmissionEmailInput, "to">) => {
+  const contactName = escapeHtml(
+    `${contactFirstName} ${contactLastName}`.trim(),
+  );
+  const safeCompanyName = escapeHtml(companyName);
+  const safeCommercialKindLabel = escapeHtml(commercialKindLabel);
+  const safeCommercialOptionLabel = escapeHtml(commercialOptionLabel);
+
+  return buildEmailLayout({
+    eyebrow: "Solicitud comercial aprobada",
+    title: "Tu solicitud comercial fue aprobada",
+    intro:
+      "El comite organizador confirmo la aprobacion de tu solicitud comercial para el Congreso Nacional de RCP.",
+    content: `
+      ${buildParagraph(`Estimado/a ${contactName}:`)}
+      ${buildParagraph(
+        `Tenemos el agrado de informarle que la solicitud comercial de ${safeCompanyName} fue aprobada y registrada como pagada completa.`,
+      )}
+      ${buildInfoGrid([
+        {
+          label: "Empresa",
+          value: safeCompanyName,
+          tone: "success",
+        },
+        {
+          label: "Tipo",
+          value: safeCommercialKindLabel,
+        },
+        {
+          label: "Opcion",
+          value: safeCommercialOptionLabel,
+        },
+      ])}
+      <div style="margin-top:22px;">
+        ${buildParagraph(
+          "Gracias por acompanar al Congreso Nacional de RCP. El equipo organizador se comunicara si necesita coordinar informacion adicional para su participacion.",
+        )}
+        ${
+          includeCatalogosLivingsLink
+            ? buildActionBlock({
+                label: "Ver catalogos de livings",
+                href: getFrontendCatalogosLivingsUrl(),
+                helper:
+                  "Consulta las opciones de livings y equipamiento disponibles para stands.",
+              })
+            : ""
+        }
+      </div>
+    `,
+    footer:
+      "Este correo fue enviado automaticamente por el sistema comercial del Congreso Nacional de RCP.",
+  });
+};
+
+const buildApprovedCommercialSubmissionEmailText = ({
+  contactFirstName,
+  contactLastName,
+  companyName,
+  commercialKindLabel,
+  commercialOptionLabel,
+  includeCatalogosLivingsLink,
+}: Omit<ApprovedCommercialSubmissionEmailInput, "to">) => {
+  const contactName = `${contactFirstName} ${contactLastName}`.trim();
+
+  return [
+    `Estimado/a ${contactName}:`,
+    "",
+    `Tenemos el agrado de informarle que la solicitud comercial de ${companyName} fue aprobada y registrada como pagada completa.`,
+    "",
+    `Empresa: ${companyName}`,
+    `Tipo: ${commercialKindLabel}`,
+    `Opcion: ${commercialOptionLabel}`,
+    "",
+    "Gracias por acompanar al Congreso Nacional de RCP. El equipo organizador se comunicara si necesita coordinar informacion adicional para su participacion.",
+    ...(includeCatalogosLivingsLink
+      ? ["", `Catalogos de livings: ${getFrontendCatalogosLivingsUrl()}`]
+      : []),
+  ].join("\n");
 };
 
 const buildCommercialSubmissionConfirmationEmailHtml = ({
@@ -832,6 +999,56 @@ const sendDiscountCouponEmail = async ({
   });
 };
 
+const sendApprovedSubmissionEmail = async ({
+  to,
+  firstName,
+  lastName,
+}: ApprovedSubmissionEmailInput) => {
+  await sendEmailWithDiagnostics("approvedSubmission", {
+    to,
+    subject: "Inscripcion aprobada al Congreso Nacional de RCP",
+    html: buildApprovedSubmissionEmailHtml({
+      firstName,
+      lastName,
+    }),
+    text: buildApprovedSubmissionEmailText({
+      firstName,
+      lastName,
+    }),
+  });
+};
+
+const sendApprovedCommercialSubmissionEmail = async ({
+  to,
+  contactFirstName,
+  contactLastName,
+  companyName,
+  commercialKindLabel,
+  commercialOptionLabel,
+  includeCatalogosLivingsLink,
+}: ApprovedCommercialSubmissionEmailInput) => {
+  await sendEmailWithDiagnostics("approvedCommercialSubmission", {
+    to,
+    subject: "Solicitud comercial aprobada para el Congreso Nacional de RCP",
+    html: buildApprovedCommercialSubmissionEmailHtml({
+      contactFirstName,
+      contactLastName,
+      companyName,
+      commercialKindLabel,
+      commercialOptionLabel,
+      includeCatalogosLivingsLink,
+    }),
+    text: buildApprovedCommercialSubmissionEmailText({
+      contactFirstName,
+      contactLastName,
+      companyName,
+      commercialKindLabel,
+      commercialOptionLabel,
+      includeCatalogosLivingsLink,
+    }),
+  });
+};
+
 const sendCommercialSubmissionConfirmationEmail = async ({
   to,
   trackingCode,
@@ -963,10 +1180,14 @@ const sendCommercialStandDiscountCouponEmail = async ({
 };
 
 export {
+  buildApprovedCommercialSubmissionEmailHtml,
+  buildApprovedSubmissionEmailHtml,
   buildCommercialStandDiscountCouponEmailHtml,
   buildCommercialSubmissionConfirmationEmailHtml,
   hasEmailTransportConfigured,
   logEmailTransportConfigStatus,
+  sendApprovedCommercialSubmissionEmail,
+  sendApprovedSubmissionEmail,
   sendCommercialSecondInstallmentConfirmationEmail,
   sendCommercialStandDiscountCouponEmail,
   sendCommercialSubmissionConfirmationEmail,

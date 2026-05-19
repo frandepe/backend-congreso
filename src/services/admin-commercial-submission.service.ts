@@ -1,8 +1,17 @@
-import { PaymentReceiptStatus } from "@prisma/client";
+import {
+  CommercialKind,
+  PaymentReceiptStatus,
+  RegistrationStatus,
+} from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/http-error";
 import type { AuthenticatedAdmin } from "../types/auth.types";
+import {
+  hasEmailTransportConfigured,
+  sendApprovedCommercialSubmissionEmail,
+} from "./email.service";
+import type { ApprovalEmailResultDto } from "../types/dto.types";
 
 type ListAdminCommercialSubmissionsInput = {
   page: number;
@@ -98,6 +107,91 @@ const syncCommercialReceiptStatusesForSubmissionStatus = async ({
       reviewedByAdminId: adminId,
     },
   });
+};
+
+const getCommercialKindLabel = (commercialKind: CommercialKind) => {
+  return commercialKind === "STAND" ? "Stand" : "Publicidad";
+};
+
+const buildNotApplicableApprovalEmailResult = (): ApprovalEmailResultDto => {
+  return {
+    status: "not_applicable",
+    attempted: false,
+    recipientEmail: null,
+    reason: "no_transition_to_fully_paid",
+  };
+};
+
+const sendCommercialApprovalEmailAfterUpdate = async ({
+  submissionId,
+  email,
+  contactFirstName,
+  contactLastName,
+  companyName,
+  commercialKind,
+  commercialOptionLabel,
+}: {
+  submissionId: string;
+  email: string;
+  contactFirstName: string;
+  contactLastName: string;
+  companyName: string;
+  commercialKind: CommercialKind;
+  commercialOptionLabel: string;
+}): Promise<ApprovalEmailResultDto> => {
+  if (!hasEmailTransportConfigured()) {
+    console.info(
+      `[admin-commercial-submissions.update.email.approved] status=skipped reason=transport_not_configured submissionId=${submissionId}`,
+    );
+
+    return {
+      status: "transport_not_configured",
+      attempted: false,
+      recipientEmail: email,
+      reason: "email_transport_not_configured",
+    };
+  }
+
+  const emailStartedAt = performance.now();
+
+  try {
+    await sendApprovedCommercialSubmissionEmail({
+      to: email,
+      contactFirstName,
+      contactLastName,
+      companyName,
+      commercialKindLabel: getCommercialKindLabel(commercialKind),
+      commercialOptionLabel,
+      includeCatalogosLivingsLink: commercialKind === "STAND",
+    });
+
+    console.info(
+      `[admin-commercial-submissions.update.email.approved] status=sent submissionId=${submissionId} emailMs=${Number(
+        (performance.now() - emailStartedAt).toFixed(1),
+      )}`,
+    );
+
+    return {
+      status: "sent",
+      attempted: true,
+      recipientEmail: email,
+      reason: "transition_to_fully_paid",
+    };
+  } catch (error) {
+    console.error(
+      `[admin-commercial-submissions.update.email.approved] status=failed submissionId=${submissionId} emailMs=${Number(
+        (performance.now() - emailStartedAt).toFixed(1),
+      )}`,
+      error,
+    );
+
+    return {
+      status: "failed",
+      attempted: true,
+      recipientEmail: email,
+      reason: "send_failed",
+    };
+  }
 };
 
 const buildWhere = ({
@@ -310,6 +404,13 @@ const updateAdminCommercialSubmission = async ({
     },
     select: {
       id: true,
+      status: true,
+      email: true,
+      companyName: true,
+      contactFirstName: true,
+      contactLastName: true,
+      commercialKind: true,
+      commercialOptionLabelSnapshot: true,
       paymentReceipts: {
         select: {
           id: true,
@@ -360,6 +461,22 @@ const updateAdminCommercialSubmission = async ({
     });
   });
 
+  const shouldSendApprovalEmail =
+    existingSubmission.status !== RegistrationStatus.FULLY_PAID &&
+    updatedSubmission.status === RegistrationStatus.FULLY_PAID;
+  const approvalEmail = shouldSendApprovalEmail
+    ? await sendCommercialApprovalEmailAfterUpdate({
+        submissionId: existingSubmission.id,
+        email: existingSubmission.email,
+        contactFirstName: existingSubmission.contactFirstName,
+        contactLastName: existingSubmission.contactLastName,
+        companyName: existingSubmission.companyName,
+        commercialKind: existingSubmission.commercialKind,
+        commercialOptionLabel:
+          existingSubmission.commercialOptionLabelSnapshot,
+      })
+    : buildNotApplicableApprovalEmailResult();
+
   return {
     id: updatedSubmission.id,
     status: updatedSubmission.status,
@@ -367,6 +484,7 @@ const updateAdminCommercialSubmission = async ({
     reviewedAt: updatedSubmission.reviewedAt,
     reviewedByAdmin: updatedSubmission.reviewedByAdmin,
     updatedAt: updatedSubmission.updatedAt,
+    approvalEmail,
   };
 };
 

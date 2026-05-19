@@ -15,7 +15,7 @@ import type {
   ValidateDiscountCouponResult,
 } from "../types/submission.types";
 
-const DISCOUNT_COUPON_EXPIRATION_MINUTES = 30;
+const DISCOUNT_COUPON_EXPIRATION_MINUTES = 120;
 const prismaAny = prisma as any;
 
 const getCouponExpirationDate = () => {

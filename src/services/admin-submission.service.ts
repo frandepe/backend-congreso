@@ -7,8 +7,13 @@ import {
 import { HttpError } from "../utils/http-error";
 import type { AuthenticatedAdmin } from "../types/auth.types";
 import type { Prisma } from "@prisma/client";
-import { PaymentReceiptStatus } from "@prisma/client";
+import { PaymentReceiptStatus, RegistrationStatus } from "@prisma/client";
+import {
+  hasEmailTransportConfigured,
+  sendApprovedSubmissionEmail,
+} from "./email.service";
 import type {
+  ApprovalEmailResultDto,
   AdminSubmissionDetailDto,
   AdminSubmissionListItemDto,
   AdminSubmissionUpdateDto,
@@ -112,6 +117,77 @@ const buildSubmissionWhere = ({
         }
       : {}),
   };
+};
+
+const buildNotApplicableApprovalEmailResult = (): ApprovalEmailResultDto => {
+  return {
+    status: "not_applicable",
+    attempted: false,
+    recipientEmail: null,
+    reason: "no_transition_to_fully_paid",
+  };
+};
+
+const sendParticipantApprovalEmailAfterUpdate = async ({
+  submissionId,
+  email,
+  firstName,
+  lastName,
+}: {
+  submissionId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}): Promise<ApprovalEmailResultDto> => {
+  if (!hasEmailTransportConfigured()) {
+    console.info(
+      `[admin-submissions.update.email.approved] status=skipped reason=transport_not_configured submissionId=${submissionId}`,
+    );
+
+    return {
+      status: "transport_not_configured",
+      attempted: false,
+      recipientEmail: email,
+      reason: "email_transport_not_configured",
+    };
+  }
+
+  const emailStartedAt = performance.now();
+
+  try {
+    await sendApprovedSubmissionEmail({
+      to: email,
+      firstName,
+      lastName,
+    });
+
+    console.info(
+      `[admin-submissions.update.email.approved] status=sent submissionId=${submissionId} emailMs=${Number(
+        (performance.now() - emailStartedAt).toFixed(1),
+      )}`,
+    );
+
+    return {
+      status: "sent",
+      attempted: true,
+      recipientEmail: email,
+      reason: "transition_to_fully_paid",
+    };
+  } catch (error) {
+    console.error(
+      `[admin-submissions.update.email.approved] status=failed submissionId=${submissionId} emailMs=${Number(
+        (performance.now() - emailStartedAt).toFixed(1),
+      )}`,
+      error,
+    );
+
+    return {
+      status: "failed",
+      attempted: true,
+      recipientEmail: email,
+      reason: "send_failed",
+    };
+  }
 };
 
 const listAdminSubmissions = async ({
@@ -317,6 +393,10 @@ const updateAdminSubmission = async ({
     },
     select: {
       id: true,
+      status: true,
+      email: true,
+      firstName: true,
+      lastName: true,
       paymentReceipts: {
         select: {
           id: true,
@@ -384,6 +464,18 @@ const updateAdminSubmission = async ({
     });
   });
 
+  const shouldSendApprovalEmail =
+    existingSubmission.status !== RegistrationStatus.FULLY_PAID &&
+    updatedSubmission.status === RegistrationStatus.FULLY_PAID;
+  const approvalEmail = shouldSendApprovalEmail
+    ? await sendParticipantApprovalEmailAfterUpdate({
+        submissionId: existingSubmission.id,
+        email: existingSubmission.email,
+        firstName: existingSubmission.firstName,
+        lastName: existingSubmission.lastName,
+      })
+    : buildNotApplicableApprovalEmailResult();
+
   return toAdminSubmissionUpdateDto({
     id: updatedSubmission.id,
     status: updatedSubmission.status,
@@ -391,6 +483,7 @@ const updateAdminSubmission = async ({
     reviewedAt: updatedSubmission.reviewedAt,
     reviewedByAdmin: updatedSubmission.reviewedByAdmin,
     updatedAt: updatedSubmission.updatedAt,
+    approvalEmail,
   });
 };
 
