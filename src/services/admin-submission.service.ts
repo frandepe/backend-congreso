@@ -223,6 +223,8 @@ const listAdminSubmissions = async ({
         },
         paymentReceipts: {
           select: {
+            amountReported: true,
+            installmentNumber: true,
             status: true,
           },
         },
@@ -232,8 +234,13 @@ const listAdminSubmissions = async ({
   ]);
 
   return {
-    items: items.map((item) =>
-      toAdminSubmissionListItemDto({
+    items: items.map((item) => {
+      const approvedFirstInstallmentReceipt = item.paymentReceipts.find(
+        (receipt) =>
+          receipt.installmentNumber === 1 && receipt.status === "APPROVED",
+      );
+
+      return toAdminSubmissionListItemDto({
         id: item.id,
         createdAt: item.createdAt,
         firstName: item.firstName,
@@ -244,6 +251,10 @@ const listAdminSubmissions = async ({
         registrationOptionCode: item.registrationOptionCode,
         registrationOptionLabelSnapshot: item.registrationOptionLabelSnapshot,
         totalAmountExpected: Number(item.totalAmountExpected),
+        approvedFirstInstallmentAmount:
+          approvedFirstInstallmentReceipt !== undefined
+            ? Number(approvedFirstInstallmentReceipt.amountReported)
+            : null,
         paymentPlanType: item.paymentPlanType,
         installmentCountExpected: item.installmentCountExpected,
         approvedReceiptsCount: item.paymentReceipts.filter(
@@ -253,8 +264,8 @@ const listAdminSubmissions = async ({
         status: item.status,
         lastReviewedAt: item.reviewedAt,
         reviewedByAdminEmail: item.reviewedByAdmin?.email,
-      }),
-    ),
+      });
+    }),
     meta: {
       page,
       pageSize,

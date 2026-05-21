@@ -33,6 +33,7 @@ export type AdminSubmissionListItemDto = {
   registrationOptionCode: RegistrationOptionCode;
   registrationOptionLabelSnapshot: string;
   totalAmountExpected: number;
+  approvedFirstInstallmentAmount: number | null;
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
   approvedReceiptsCount: number;
@@ -366,6 +367,7 @@ export type AdminCommercialSubmissionListItemDto = {
   commercialOptionCode: CommercialOptionCode;
   commercialOptionLabelSnapshot: string;
   totalAmountExpected: number;
+  approvedFirstInstallmentAmount: number | null;
   paymentPlanType: PaymentPlanType;
   installmentCountExpected: number;
   submittedReceiptsCount: number;

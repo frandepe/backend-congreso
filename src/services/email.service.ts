@@ -224,9 +224,7 @@ const sendEmailWithDiagnostics = async (
     });
 
     if (result.error) {
-      throw new Error(
-        `${result.error.name}: ${result.error.message}`,
-      );
+      throw new Error(`${result.error.name}: ${result.error.message}`);
     }
 
     console.info(
@@ -405,23 +403,23 @@ const buildApprovedSubmissionEmailHtml = ({
     eyebrow: "Inscripcion aprobada",
     title: "Bienvenido al Congreso Nacional de RCP",
     intro:
-      "Tu inscripcion fue aprobada por el comite organizador. Te esperamos en el congreso.",
+      "Tu inscripción fue aprobada por el comité organizador. Te esperamos en el congreso.",
     content: `
       ${buildParagraph(`Estimado/a ${participantName}:`)}
       ${buildParagraph(
-        'Mi nombre es Nicolas De Paulo y en nombre del comite organizador del "Segundo congreso nacional de instructores de RCP" tengo el agrado de informarle que su inscripcion se realizo con exito. De esta manera le damos la bienvenida a nuestro segundo congreso a realizarse los dias 2, 3 y 4 de Octubre.',
+        'Mi nombre es Nicolas De Paulo y en nombre del comité organizador del "Segundo congreso nacional de instructores de RCP" tengo el agrado de informarle que su inscripción se realizó con éxito. De esta manera le damos la bienvenida a nuestro segundo congreso a realizarse los dias 2, 3 y 4 de Octubre.',
       )}
       ${buildParagraph(
-        "Valoramos mucho que seas parte y deseamos que este congreso marque un antes y un despues en tu camino profesional.",
+        "Valoramos mucho que seas parte y deseamos que este congreso marque un antes y un después en tu camino profesional.",
       )}
       ${buildParagraph(
-        "Le recordamos que en nuestra pagina encontrara toda la informacion necesaria para su estadia y participacion.",
+        "Te recordamos que en nuestra página encontrarás toda la información necesaria para tu estadia y participación.",
       )}
       ${buildActionBlock({
-        label: "Ver ubicacion y alojamiento",
+        label: "Ver ubicación y alojamiento",
         href: accommodationUrl,
         helper:
-          "Consulta informacion util para organizar tu estadia durante el congreso.",
+          "Consulta información útil para organizar tu estadia durante el congreso.",
       })}
       ${buildActionBlock({
         label: "Ver programa",
@@ -448,12 +446,12 @@ const buildApprovedSubmissionEmailText = ({
   return [
     `Estimado/a ${participantName}:`,
     "",
-    'Mi nombre es Nicolas De Paulo y en nombre del comite organizador del "Segundo congreso nacional de instructores de RCP" tengo el agrado de informarle que su inscripcion se realizo con exito. De esta manera le damos la bienvenida a nuestro segundo congreso a realizarse los dias 2, 3 y 4 de Octubre.',
+    'Mi nombre es Nicolas De Paulo y en nombre del comité organizador del "Segundo congreso nacional de instructores de RCP" tengo el agrado de informarle que su inscripción se realizó con éxito. De esta manera le damos la bienvenida a nuestro segundo congreso a realizarse los días 2, 3 y 4 de Octubre.',
     "",
-    "Valoramos mucho que seas parte y deseamos que este congreso marque un antes y un despues en tu camino profesional.",
+    "Valoramos mucho que seas parte y deseamos que este congreso marque un antes y un después en tu camino profesional.",
     "",
-    "Informacion util:",
-    `Ubicacion y alojamiento: ${getFrontendAccommodationUrl()}`,
+    "Información útil:",
+    `Ubicación y alojamiento: ${getFrontendAccommodationUrl()}`,
     `Programa: ${getFrontendProgramUrl()}`,
     "",
     "Lo saluda muy atte.-",
@@ -480,7 +478,7 @@ const buildApprovedCommercialSubmissionEmailHtml = ({
     eyebrow: "Solicitud comercial aprobada",
     title: "Tu solicitud comercial fue aprobada",
     intro:
-      "El comite organizador confirmo la aprobacion de tu solicitud comercial para el Congreso Nacional de RCP.",
+      "El comité organizador confirmó la aprobación de tu solicitud comercial para el Congreso Nacional de RCP.",
     content: `
       ${buildParagraph(`Estimado/a ${contactName}:`)}
       ${buildParagraph(
@@ -503,7 +501,7 @@ const buildApprovedCommercialSubmissionEmailHtml = ({
       ])}
       <div style="margin-top:22px;">
         ${buildParagraph(
-          "Gracias por acompanar al Congreso Nacional de RCP. El equipo organizador se comunicara si necesita coordinar informacion adicional para su participacion.",
+          "Gracias por acompañar al Congreso Nacional de RCP. El equipo organizador se comunicará si necesita coordinar información adicional para su participación.",
         )}
         ${
           includeCatalogosLivingsLink
@@ -511,7 +509,7 @@ const buildApprovedCommercialSubmissionEmailHtml = ({
                 label: "Ver catalogos de livings",
                 href: getFrontendCatalogosLivingsUrl(),
                 helper:
-                  "Consulta las opciones de livings y equipamiento disponibles para stands.",
+                  "Consultá las opciones de livings y equipamiento disponibles para stands.",
               })
             : ""
         }
@@ -541,7 +539,7 @@ const buildApprovedCommercialSubmissionEmailText = ({
     `Tipo: ${commercialKindLabel}`,
     `Opcion: ${commercialOptionLabel}`,
     "",
-    "Gracias por acompanar al Congreso Nacional de RCP. El equipo organizador se comunicara si necesita coordinar informacion adicional para su participacion.",
+    "Gracias por acompañar al Congreso Nacional de RCP. El equipo organizador se comunicará si necesita coordinar información adicional para su participación.",
     ...(includeCatalogosLivingsLink
       ? ["", `Catalogos de livings: ${getFrontendCatalogosLivingsUrl()}`]
       : []),
@@ -621,7 +619,7 @@ const buildCommercialSubmissionConfirmationEmailHtml = ({
       ])}
       <div style="margin-top:22px;">
         ${buildParagraph(
-          "Guarda este codigo de seguimiento. Te servira para cualquier consulta manual que el comite necesite resolver sobre esta contratacion.",
+          "Guardá este codigo de seguimiento. Te servirá para cualquier consulta manual que el comité necesite resolver sobre esta contratación.",
         )}
         ${
           commercialKindLabel === "Stand"
@@ -658,13 +656,13 @@ const buildCommercialStandDiscountCouponEmailHtml = ({
 
   return buildEmailLayout({
     eyebrow: "Descuento para expositores",
-    title: "Tu cupon para stand ya esta listo",
+    title: "Tu cupón para stand ya está listo",
     intro:
-      "Generamos un cupon exclusivo para este email. Aplicalo al contratar tu stand antes de que venza.",
+      "Generamos un cupón exclusivo para este email. Aplicalo al contratar tu stand antes de que venza.",
     content: `
       ${buildInfoGrid([
         {
-          label: "Cupon",
+          label: "Cupón",
           value: couponCode,
           tone: "success",
         },
@@ -675,7 +673,7 @@ const buildCommercialStandDiscountCouponEmailHtml = ({
       ])}
       <div style="margin-top:22px;">
         ${buildParagraph(
-          "Si solicitas un nuevo cupon antes de usar este, el anterior queda invalidado automaticamente.",
+          "Si solicitas un nuevo cupón antes de usar este, el anterior queda invalidado automaticamente.",
         )}
         ${buildActionBlock({
           label: "Ir a expositores",
@@ -715,10 +713,10 @@ const sendCommercialTrackingCodeRecoveryEmail = async ({
 
   await sendEmailWithDiagnostics("commercialTrackingCodeRecovery", {
     to,
-    subject: "Recuperacion de codigo para stands del Congreso",
+    subject: "Recuperación de código para stands del Congreso",
     html: buildEmailLayout({
-      eyebrow: "Recuperacion",
-      title: "Encontramos tus codigos de stand",
+      eyebrow: "Recuperación",
+      title: "Encontramos tus códigos de stand",
       intro:
         "Estas son las solicitudes de stand asociadas a este email que todavia pueden servirte para seguimiento o segunda cuota.",
       content: `
@@ -729,11 +727,11 @@ const sendCommercialTrackingCodeRecoveryEmail = async ({
           label: "Abrir segunda cuota comercial",
           href: secondInstallmentUrl,
           helper:
-            "Puedes usar cualquiera de estos codigos en la pantalla publica de segunda cuota comercial.",
+            "Podés usar cualquiera de estos códigos en la pantalla publica de segunda cuota comercial.",
         })}
       `,
       footer:
-        "Si no solicitaste esta recuperacion, puedes ignorar este mensaje.",
+        "Si no solicitaste esta recuperacion, podés ignorar este mensaje.",
     }),
   });
 };
@@ -855,10 +853,10 @@ const sendTrackingCodeRecoveryEmail = async ({
 
   await sendEmailWithDiagnostics("trackingCodeRecovery", {
     to,
-    subject: "Recuperacion de codigo de inscripcion",
+    subject: "Recuperación de código de inscripción",
     html: buildEmailLayout({
-      eyebrow: "Recuperacion",
-      title: "Encontramos tus codigos",
+      eyebrow: "Recuperación",
+      title: "Encontramos tus códigos",
       intro:
         "Estas son las inscripciones asociadas a este email que todavia pueden serte utiles para seguimiento o segunda cuota.",
       content: `
@@ -869,11 +867,11 @@ const sendTrackingCodeRecoveryEmail = async ({
           label: "Abrir pantalla de segunda cuota",
           href: secondInstallmentUrl,
           helper:
-            "Puedes usar cualquiera de estos codigos en la pantalla publica de segunda cuota.",
+            "Podés usar cualquiera de estos códigos en la pantalla publica de segunda cuota.",
         })}
       `,
       footer:
-        "Si no solicitaste esta recuperacion, puedes ignorar este mensaje.",
+        "Si no solicitaste esta recuperacion, podés ignorar este mensaje.",
     }),
   });
 };
@@ -944,7 +942,7 @@ const sendSecondInstallmentConfirmationEmail = async ({
         ${buildInfoGrid(infoBlocks)}
         <div style="margin-top:22px;">
           ${buildParagraph(
-            "Guarda este codigo de seguimiento para consultar el estado actualizado de tu inscripcion.",
+            "Guardá este codigo de seguimiento para consultar el estado actualizado de tu inscripcion.",
           )}
         </div>
       `,
@@ -963,16 +961,16 @@ const sendDiscountCouponEmail = async ({
 
   await sendEmailWithDiagnostics("discountCoupon", {
     to,
-    subject: "Tu cupon de descuento para el Congreso",
+    subject: "Tu cupón de descuento para el Congreso",
     html: buildEmailLayout({
       eyebrow: "Descuento 20% OFF",
-      title: "Tu cupon ya esta listo",
+      title: "Tu cupón ya está listo",
       intro:
-        "Generamos un cupon exclusivo para este email. Aplicalo en la inscripcion antes de que venza.",
+        "Generamos un cupón exclusivo para este email. Aplicalo en la inscripción antes de que venza.",
       content: `
         ${buildInfoGrid([
           {
-            label: "Cupon",
+            label: "Cupón",
             value: couponCode,
             tone: "success",
           },
@@ -983,10 +981,10 @@ const sendDiscountCouponEmail = async ({
         ])}
         <div style="margin-top:22px;">
           ${buildParagraph(
-            "Si solicitas un nuevo cupon antes de usar este, el anterior queda invalidado automaticamente.",
+            "Si solicitas un nuevo cupón antes de usar este, el anterior queda invalidado automaticamente.",
           )}
           ${buildActionBlock({
-            label: "Ir a la inscripcion",
+            label: "Ir a la inscripción",
             href: registrationUrl,
             helper:
               "Aplica el codigo dentro del formulario con el mismo email con el que pediste el descuento.",

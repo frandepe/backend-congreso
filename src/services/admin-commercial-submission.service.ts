@@ -249,6 +249,8 @@ const listAdminCommercialSubmissions = async ({
         },
         paymentReceipts: {
           select: {
+            amountReported: true,
+            installmentNumber: true,
             status: true,
           },
           orderBy: {
@@ -261,27 +263,38 @@ const listAdminCommercialSubmissions = async ({
   ]);
 
   return {
-    items: items.map((item) => ({
-      id: item.id,
-      createdAt: item.createdAt,
-      companyName: item.companyName,
-      contactFirstName: item.contactFirstName,
-      contactLastName: item.contactLastName,
-      email: item.email,
-      phone: item.phone,
-      commercialKind: item.commercialKind,
-      commercialOptionCode: item.commercialOptionCode,
-      commercialOptionLabelSnapshot: item.commercialOptionLabelSnapshot,
-      totalAmountExpected: Number(item.totalAmountExpected),
-      paymentPlanType: item.paymentPlanType,
-      installmentCountExpected: item.installmentCountExpected,
-      submittedReceiptsCount: item.paymentReceipts.length,
-      hasDiscountCoupon: item.discountAppliedAmount !== null,
-      receiptStatus: item.paymentReceipts[0]?.status ?? null,
-      status: item.status,
-      lastReviewedAt: item.reviewedAt,
-      reviewedByAdminEmail: item.reviewedByAdmin?.email,
-    })),
+    items: items.map((item) => {
+      const approvedFirstInstallmentReceipt = item.paymentReceipts.find(
+        (receipt) =>
+          receipt.installmentNumber === 1 && receipt.status === "APPROVED",
+      );
+
+      return {
+        id: item.id,
+        createdAt: item.createdAt,
+        companyName: item.companyName,
+        contactFirstName: item.contactFirstName,
+        contactLastName: item.contactLastName,
+        email: item.email,
+        phone: item.phone,
+        commercialKind: item.commercialKind,
+        commercialOptionCode: item.commercialOptionCode,
+        commercialOptionLabelSnapshot: item.commercialOptionLabelSnapshot,
+        totalAmountExpected: Number(item.totalAmountExpected),
+        approvedFirstInstallmentAmount:
+          approvedFirstInstallmentReceipt !== undefined
+            ? Number(approvedFirstInstallmentReceipt.amountReported)
+            : null,
+        paymentPlanType: item.paymentPlanType,
+        installmentCountExpected: item.installmentCountExpected,
+        submittedReceiptsCount: item.paymentReceipts.length,
+        hasDiscountCoupon: item.discountAppliedAmount !== null,
+        receiptStatus: item.paymentReceipts[0]?.status ?? null,
+        status: item.status,
+        lastReviewedAt: item.reviewedAt,
+        reviewedByAdminEmail: item.reviewedByAdmin?.email,
+      };
+    }),
     meta: {
       page,
       pageSize,
