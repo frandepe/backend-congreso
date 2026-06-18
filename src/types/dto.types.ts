@@ -175,6 +175,9 @@ export type PublicSubmissionStatusDto = {
   submittedReceiptsCount: number;
   approvedReceiptsCount: number;
   pendingReceiptsCount: number;
+  email: string;
+  firstName: string;
+  lastName: string;
   receipts: Array<{
     installmentNumber: number;
     status: PaymentReceiptStatus;

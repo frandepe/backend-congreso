@@ -1,4 +1,8 @@
-import { PaymentReceiptStatus, Prisma, RegistrationStatus } from "@prisma/client";
+import {
+  PaymentReceiptStatus,
+  Prisma,
+  RegistrationStatus,
+} from "@prisma/client";
 import {
   toPublicAdditionalReceiptCreatedDto,
   toPublicDiscountCouponRequestResponseDto,
@@ -86,7 +90,10 @@ const resolveSecondInstallmentDueAt = (input: {
   return fallbackDueAt;
 };
 
-const isSecondInstallmentExpired = (dueAt: Date | null, now: Date = new Date()) => {
+const isSecondInstallmentExpired = (
+  dueAt: Date | null,
+  now: Date = new Date(),
+) => {
   if (!dueAt) {
     return false;
   }
@@ -210,7 +217,9 @@ const createInitialSubmission = async (
     input.paymentPlanType,
     registrationReferenceDate,
   );
-  const registrationOption = getRegistrationOption(input.registrationOptionCode);
+  const registrationOption = getRegistrationOption(
+    input.registrationOptionCode,
+  );
 
   const uploadStartedAt = nowMs();
   const uploadedReceipt = await uploadReceiptBuffer(file);
@@ -251,11 +260,14 @@ const createInitialSubmission = async (
           registrationOptionCode: input.registrationOptionCode,
           registrationOptionLabelSnapshot: registrationOption.label,
           currencyCode: "ARS",
-          baseAmountExpected: pricingSummary.registrationOption.totalAmountExpected,
+          baseAmountExpected:
+            pricingSummary.registrationOption.totalAmountExpected,
           discountAppliedPercentage:
             discountPercentage > 0 ? discountPercentage : null,
           discountAppliedAmount:
-            discountPercentage > 0 ? pricingSummary.discountAppliedAmount : null,
+            discountPercentage > 0
+              ? pricingSummary.discountAppliedAmount
+              : null,
           discountEligibleEmailNormalized:
             resolvedCoupon?.emailNormalized ?? null,
           totalAmountExpected: pricingSummary.finalTotalAmount,
@@ -333,7 +345,9 @@ const createInitialSubmission = async (
         trackingCode,
         registrationOptionLabel: registrationOption.label,
         paymentPlanLabel,
-        totalAmountExpected: Number(result.registrationSubmission.totalAmountExpected),
+        totalAmountExpected: Number(
+          result.registrationSubmission.totalAmountExpected,
+        ),
         installmentAmountExpected:
           result.registrationSubmission.installmentAmountExpected !== null
             ? Number(result.registrationSubmission.installmentAmountExpected)
@@ -344,8 +358,7 @@ const createInitialSubmission = async (
           result.registrationSubmission.discountAppliedAmount !== null
             ? Number(result.registrationSubmission.discountAppliedAmount)
             : null,
-        secondInstallmentDueAt:
-          createdSubmissionSecondInstallmentDueAt ?? null,
+        secondInstallmentDueAt: createdSubmissionSecondInstallmentDueAt ?? null,
       });
     }
 
@@ -356,16 +369,18 @@ const createInitialSubmission = async (
       registrationOption: {
         code: input.registrationOptionCode,
         label: registrationOption.label,
-        totalAmountExpected: Number(result.registrationSubmission.totalAmountExpected),
+        totalAmountExpected: Number(
+          result.registrationSubmission.totalAmountExpected,
+        ),
       },
       paymentPlanType: result.registrationSubmission.paymentPlanType,
-      installmentCountExpected: result.registrationSubmission.installmentCountExpected,
+      installmentCountExpected:
+        result.registrationSubmission.installmentCountExpected,
       installmentAmountExpected:
         result.registrationSubmission.installmentAmountExpected !== null
           ? Number(result.registrationSubmission.installmentAmountExpected)
           : null,
-      secondInstallmentDueAt:
-        createdSubmissionSecondInstallmentDueAt ?? null,
+      secondInstallmentDueAt: createdSubmissionSecondInstallmentDueAt ?? null,
       receipt: {
         installmentNumber: input.installmentNumber,
         status: PaymentReceiptStatus.PENDING_REVIEW,
@@ -537,8 +552,7 @@ const createAdditionalReceipt = async (
         existingSubmissionInstallmentAmount != null
           ? Number(existingSubmissionInstallmentAmount)
           : null,
-      secondInstallmentDueAt:
-        resolvedSecondInstallmentDueAt,
+      secondInstallmentDueAt: resolvedSecondInstallmentDueAt,
       secondInstallmentExpired,
       receipt: {
         installmentNumber: result.paymentReceipt.installmentNumber,
@@ -599,6 +613,7 @@ const getPublicSubmissionStatus = async (
     }),
     createdAt: receipt.createdAt,
   }));
+
   const approvedReceiptsCount = publicReceipts.filter(
     (receipt) => receipt.status === PaymentReceiptStatus.APPROVED,
   ).length;
@@ -643,6 +658,9 @@ const getPublicSubmissionStatus = async (
     submittedReceiptsCount: submission.paymentReceipts.length,
     approvedReceiptsCount,
     pendingReceiptsCount,
+    email: submission.email,
+    firstName: submission.firstName,
+    lastName: submission.lastName,
     receipts: publicReceipts,
   });
 };
@@ -760,38 +778,36 @@ const findPendingSecondInstallment = async ({
   };
 };
 
-const getPublicPricingCatalog = async (): Promise<PublicPricingCatalogResult> => {
-  const referenceDate = new Date();
+const getPublicPricingCatalog =
+  async (): Promise<PublicPricingCatalogResult> => {
+    const referenceDate = new Date();
 
-  return toPublicPricingCatalogDto({
-    discountPercentage: DEFAULT_DISCOUNT_PERCENTAGE,
-    installmentsAvailable: isInstallmentsAvailable(referenceDate),
-    installmentsAvailableUntil: INSTALLMENTS_AVAILABLE_UNTIL,
-    installmentsTimezone: INSTALLMENTS_TIMEZONE,
-    options: (
-      [
-        "ONE_DAY",
-        "THREE_DAYS",
-        "THREE_DAYS_WITH_LODGING",
-      ] as const
-    ).map((registrationOptionCode) => {
-      const registrationOption = getRegistrationOption(registrationOptionCode);
+    return toPublicPricingCatalogDto({
+      discountPercentage: DEFAULT_DISCOUNT_PERCENTAGE,
+      installmentsAvailable: isInstallmentsAvailable(referenceDate),
+      installmentsAvailableUntil: INSTALLMENTS_AVAILABLE_UNTIL,
+      installmentsTimezone: INSTALLMENTS_TIMEZONE,
+      options: (
+        ["ONE_DAY", "THREE_DAYS", "THREE_DAYS_WITH_LODGING"] as const
+      ).map((registrationOptionCode) => {
+        const registrationOption = getRegistrationOption(
+          registrationOptionCode,
+        );
 
-      return {
-        code: registrationOption.code,
-        label: registrationOption.label,
-        baseTotalAmount: registrationOption.totalAmountExpected,
-        discountedTotalAmount: buildPricingSummary({
-          registrationOptionCode,
-          paymentPlanType: "ONE_PAYMENT",
-          discountPercentage: DEFAULT_DISCOUNT_PERCENTAGE,
-          referenceDate,
-        }).finalTotalAmount,
-        paymentPlans: getAllowedPaymentPlanTypes(
-          registrationOptionCode,
-          referenceDate,
-        ).map(
-          (paymentPlanType) => {
+        return {
+          code: registrationOption.code,
+          label: registrationOption.label,
+          baseTotalAmount: registrationOption.totalAmountExpected,
+          discountedTotalAmount: buildPricingSummary({
+            registrationOptionCode,
+            paymentPlanType: "ONE_PAYMENT",
+            discountPercentage: DEFAULT_DISCOUNT_PERCENTAGE,
+            referenceDate,
+          }).finalTotalAmount,
+          paymentPlans: getAllowedPaymentPlanTypes(
+            registrationOptionCode,
+            referenceDate,
+          ).map((paymentPlanType) => {
             const basePricing = buildPricingSummary({
               registrationOptionCode,
               paymentPlanType,
@@ -809,15 +825,13 @@ const getPublicPricingCatalog = async (): Promise<PublicPricingCatalogResult> =>
               label: getPaymentPlanDefinition(paymentPlanType).label,
               installmentCount: getInstallmentCountExpected(paymentPlanType),
               baseInstallmentAmount: basePricing.installmentAmount,
-              discountedInstallmentAmount:
-                discountedPricing.installmentAmount,
+              discountedInstallmentAmount: discountedPricing.installmentAmount,
             };
-          },
-        ),
-      };
-    }),
-  });
-};
+          }),
+        };
+      }),
+    });
+  };
 
 const requestPublicDiscountCoupon = async ({
   email,
