@@ -202,6 +202,7 @@ const createInitialSubmission = async (
   file: Express.Multer.File,
 ): Promise<CreateInitialSubmissionResult> => {
   const requestStartedAt = nowMs();
+  const receiptSubmittedAt = new Date();
 
   if (input.installmentNumber !== 1) {
     throw new HttpError(
@@ -288,7 +289,7 @@ const createInitialSubmission = async (
           registrationSubmissionId: registrationSubmission.id,
           installmentNumber: input.installmentNumber,
           amountReported: input.amountReported,
-          paymentDate: input.paymentDate,
+          paymentDate: receiptSubmittedAt,
           receiptUrl: uploadedReceipt.secureUrl,
           receiptPublicId: uploadedReceipt.publicId,
           receiptOriginalFilename: uploadedReceipt.originalFilename,
@@ -401,6 +402,8 @@ const createAdditionalReceipt = async (
   input: CreateAdditionalReceiptInput,
   file: Express.Multer.File,
 ): Promise<CreateAdditionalReceiptResult> => {
+  const receiptSubmittedAt = new Date();
+
   const existingSubmission = await prisma.registrationSubmission.findUnique({
     where: {
       id: normalizeTrackingCode(input.registrationId),
@@ -499,7 +502,7 @@ const createAdditionalReceipt = async (
           registrationSubmissionId: existingSubmission.id,
           installmentNumber: input.installmentNumber,
           amountReported: input.amountReported,
-          paymentDate: input.paymentDate,
+          paymentDate: receiptSubmittedAt,
           receiptUrl: uploadedReceipt.secureUrl,
           receiptPublicId: uploadedReceipt.publicId,
           receiptOriginalFilename: uploadedReceipt.originalFilename,

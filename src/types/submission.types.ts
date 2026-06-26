@@ -24,7 +24,6 @@ export type CreateInitialSubmissionInput = {
   installmentNumber: number;
   amountReported: number;
   discountCouponCode?: string;
-  paymentDate?: Date;
   notes?: string;
 };
 
@@ -53,7 +52,6 @@ export type CreateAdditionalReceiptInput = {
   registrationId: string;
   installmentNumber: number;
   amountReported: number;
-  paymentDate?: Date;
 };
 
 export type CreateAdditionalReceiptResult = {
