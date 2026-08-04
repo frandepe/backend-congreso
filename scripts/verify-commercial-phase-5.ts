@@ -28,7 +28,7 @@ function runPricingAssertions() {
   const catalog = getCommercialPricingCatalog();
 
   assert.equal(catalog.standDiscountAmount, 100000);
-  assert.equal(catalog.standOptions[0]?.baseAmount, 300000);
+  assert.equal(catalog.standOptions[0]?.baseAmount, 250000);
   assert.equal(catalog.standOptions[0]?.discountedAmount, 200000);
   assert.deepEqual(
     catalog.standOptions[0]?.paymentPlans.map((plan) => plan.type),
@@ -42,7 +42,7 @@ function runPricingAssertions() {
       paymentPlanType: "ONE_PAYMENT",
       applyStandDiscount: false,
     }).totalAmount,
-    300000,
+    250000,
   );
 
   assert.equal(
@@ -59,7 +59,7 @@ function runPricingAssertions() {
     ["ADVERTISING_WEB_PAGE", 100000],
     ["ADVERTISING_WEB_AND_SCREEN", 150000],
     ["ADVERTISING_BANNERS_CLIENT_PROVIDED", 200000],
-    ["ADVERTISING_BANNERS_INCLUDED_BY_CONGRESS", 300000],
+    ["ADVERTISING_BANNERS_INCLUDED_BY_CONGRESS", 250000],
   ] as const;
 
   for (const [commercialOptionCode, expectedTotal] of advertisingExpectations) {
@@ -137,11 +137,7 @@ function runEmailAssertions() {
     secondInstallmentDueAt: new Date("2026-05-01T12:00:00.000Z"),
   });
 
-  assertIncludes(
-    submissionHtml,
-    "COM-000123",
-    "commercial confirmation email",
-  );
+  assertIncludes(submissionHtml, "COM-000123", "commercial confirmation email");
   assertIncludes(
     submissionHtml,
     "Empresa Demo",
@@ -178,17 +174,18 @@ function runEmailAssertions() {
     "commercial confirmation email",
   );
 
-  const advertisingSubmissionHtml = buildCommercialSubmissionConfirmationEmailHtml({
-    trackingCode: "COM-000456",
-    commercialKindLabel: "Publicidad",
-    commercialOptionLabel: "Publicidad en pagina del congreso",
-    companyName: "Empresa Publicidad",
-    paymentPlanLabel: "2 cuotas",
-    totalAmountExpected: 100000,
-    installmentAmountExpected: 50000,
-    discountAppliedAmount: null,
-    secondInstallmentDueAt: new Date("2026-05-01T12:00:00.000Z"),
-  });
+  const advertisingSubmissionHtml =
+    buildCommercialSubmissionConfirmationEmailHtml({
+      trackingCode: "COM-000456",
+      commercialKindLabel: "Publicidad",
+      commercialOptionLabel: "Publicidad en pagina del congreso",
+      companyName: "Empresa Publicidad",
+      paymentPlanLabel: "2 cuotas",
+      totalAmountExpected: 100000,
+      installmentAmountExpected: 50000,
+      discountAppliedAmount: null,
+      secondInstallmentDueAt: new Date("2026-05-01T12:00:00.000Z"),
+    });
 
   assertIncludes(
     advertisingSubmissionHtml,
@@ -222,11 +219,7 @@ function runEmailAssertions() {
   });
 
   assertIncludes(couponHtml, "STAND-ABC123", "stand coupon email");
-  assertIncludes(
-    couponHtml,
-    "/inscripcion/expositores",
-    "stand coupon email",
-  );
+  assertIncludes(couponHtml, "/inscripcion/expositores", "stand coupon email");
   assertIncludes(
     couponHtml,
     "Descuento para expositores",
@@ -251,7 +244,7 @@ function runWorkbookAssertions() {
         email: "ana@empresa.com",
         phone: "123456",
         currencyCode: "ARS",
-        baseAmountExpected: 300000,
+        baseAmountExpected: 250000,
         equipmentAdditionalAmount: null,
         includesEquipment: false,
         discountAppliedAmount: 100000,
@@ -354,15 +347,31 @@ function runWorkbookAssertions() {
     "2026-04-01 15:00:00",
   );
 
-  assertIncludes(workbookXml, 'Worksheet ss:Name="Solicitudes"', "workbook xml");
-  assertIncludes(workbookXml, 'Worksheet ss:Name="Comprobantes"', "workbook xml");
+  assertIncludes(
+    workbookXml,
+    'Worksheet ss:Name="Solicitudes"',
+    "workbook xml",
+  );
+  assertIncludes(
+    workbookXml,
+    'Worksheet ss:Name="Comprobantes"',
+    "workbook xml",
+  );
   assertIncludes(workbookXml, "Cupon descuento", "workbook xml");
   assertIncludes(workbookXml, "STAND-ABC123", "workbook xml");
   assertIncludes(workbookXml, "URL comprobante", "workbook xml");
-  assertIncludes(workbookXml, "https://example.com/receipt.pdf", "workbook xml");
+  assertIncludes(
+    workbookXml,
+    "https://example.com/receipt.pdf",
+    "workbook xml",
+  );
   assertIncludes(workbookXml, "Publicidad", "workbook xml");
   assertIncludes(workbookXml, "ADVERTISING_WEB_PAGE", "workbook xml");
-  assertIncludes(workbookXml, "https://example.com/advertising-receipt-2.pdf", "workbook xml");
+  assertIncludes(
+    workbookXml,
+    "https://example.com/advertising-receipt-2.pdf",
+    "workbook xml",
+  );
   assertIncludes(workbookXml, ">2</Data>", "workbook xml");
 }
 

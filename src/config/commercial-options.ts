@@ -35,7 +35,7 @@ const COMMERCIAL_OPTIONS: Record<
     code: "STAND_SPACE_3X3",
     kind: "STAND",
     label: "Stand 3x3",
-    totalAmount: 300000,
+    totalAmount: 250000,
   },
   ADVERTISING_WEB_PAGE: {
     code: "ADVERTISING_WEB_PAGE",
@@ -59,7 +59,7 @@ const COMMERCIAL_OPTIONS: Record<
     code: "ADVERTISING_BANNERS_INCLUDED_BY_CONGRESS",
     kind: "ADVERTISING",
     label: "Publicidad en banners con banner incluido por el congreso",
-    totalAmount: 300000,
+    totalAmount: 250000,
   },
 };
 
